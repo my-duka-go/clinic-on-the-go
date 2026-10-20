@@ -17,12 +17,14 @@ stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, setting
 | 4 | **Billing & pharmacy** — patient and visit on the bill and receipt; **Insurance** payment (SHA / private) records a claim the insurer owes — never cash in the drawer — tracked on **Insurance Claims** (to submit → submitted → paid, or rejected → owed by the patient) with a printable claim summary; prescription-only medicines need a doctor's order (or a doctor at the desk, logged); **Dispensing** record; printed medicine labels | done |
 | 5 | **Appointments** — book a registered patient or a new person (name + phone), with a doctor or any doctor; clash and double-booking warnings; day list (late / missed / cancelled); reminders by SMS or WhatsApp from the phone; check in as a visit (a new person registers first); coming appointments on the patient file; doctor books a follow-up from a visit | done |
 | 5b | **Full hospital flow** (from the Hospitali Ndogo reference, without the ward) — **Patient tracker**: today's numbers and one tab per step: Triage → Doctor → Lab → Cashier → Pharmacy → Done, plus a timeline on every visit. Dangerous vitals make the patient **urgent** (front of the doctor queue); the doctor **sends to the lab**, results bring the patient **back to the doctor** ("Results back"); the prescription reaches the **pharmacy** as soon as the doctor finishes (prepare + allergy check), the patient pays at the cashier, then the pharmacy gives it out. **Allergy checks** by medicine class; **insurance cover %** with the patient's co-pay | done |
-| 6 | **Own Supabase project** — tables + row-level security per clinic, sign-in functions (copied from the POS), deploy | next - needs the project |
+| 6 | **Own Supabase project** (`hugaqzeqefzzpsvaanfm`) — the POS database copied from the live POS (tables, keys, row-level security, PIN scrambling with its own key, rate limits, licences, devices, hourly suspension) + clinic tables `patients`, `visits`, `appointments`, `dispensing` (whole record in `doc`, one clinic per row); sign-in functions `shop-auth`, `super-admin-login`, `platform-rest`, `pin-reset` deployed; the app sends and fetches clinic records, so reception, nurse, doctor and pharmacy can each use their own phone | done |
 
-## Before Supabase is connected (local-only mode)
-With no backend configured the app runs on one phone: the first Administrator sets the clinic up, staff PINs are checked
-for clashes on that phone only, and nothing syncs. Once stage 6 connects the clinic's Supabase project, sign-in, PIN
-checks and registration go through the server as before, and the local records are uploaded once.
+## Server (stage 6)
+- Project `hugaqzeqefzzpsvaanfm` (eu-central-1). SQL kept in `supabase/clinic_schema.sql`, `clinic_functions.sql`,
+  `clinic_tables_and_security.sql`; functions in `supabase/functions/`. The app uses the project's public (anon) key.
+- A phone set up before the server existed (builds 1-8) only has its clinic on that phone; at sign-in it is offered
+  "Start fresh" (clears only the clinic's data on the phone, never the POS's) so the clinic can be set up on the server.
+- Still to set: Brevo email secrets (`BREVO_API_KEY`, `MAIL_FROM`) for "Forgot PIN?"; a Platform Administrator PIN.
 
 ## Data (phone database now, Supabase tables in stage 6; every row has `clinic_id`)
 - **patients**: id, clinic_id, patient_no (e.g. `P-00042`), full_name, sex, date_of_birth (or age), phone, national_id,

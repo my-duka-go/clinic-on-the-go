@@ -16,7 +16,7 @@
 // Email goes out through Brevo (https://www.brevo.com). Secrets:
 //   BREVO_API_KEY   - Brevo > SMTP & API > API keys
 //   MAIL_FROM       - a sender address verified in Brevo (Senders, domains & dedicated IPs)
-//   MAIL_FROM_NAME  - optional, defaults to "My DukaGO POS"
+//   MAIL_FROM_NAME  - optional, defaults to "Clinic On the Go"
 // Automated tests only: while a row ('test_key', <long random value>) exists in public.pin_reset_config, a request
 // carrying header x-reset-test with that exact value gets the code back in the reply instead of an email.
 // Delete the row after testing (normal use has no row, so test mode is off).
@@ -27,7 +27,7 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const BREVO_KEY = Deno.env.get('BREVO_API_KEY') || '';
 const MAIL_FROM = Deno.env.get('MAIL_FROM') || '';
-const MAIL_FROM_NAME = Deno.env.get('MAIL_FROM_NAME') || 'My DukaGO POS';
+const MAIL_FROM_NAME = Deno.env.get('MAIL_FROM_NAME') || 'Clinic On the Go';
 async function testKey() {
   const { data } = await admin.from('pin_reset_config').select('v').eq('k', 'test_key').maybeSingle();
   return data && String(data.v).length >= 32 ? String(data.v) : '';
@@ -93,7 +93,7 @@ async function sendMail(to: string, subject: string, text: string, html: string)
   return { ok: true };
 }
 
-const card = (inner: string) => `<div style="font-family:Arial,Helvetica,sans-serif;max-width:440px;margin:0 auto;padding:24px;border:1px solid #e6dccb;border-radius:12px;color:#2b2620">${inner}<p style="font-size:11px;color:#8a7f70;margin-top:24px">My DukaGO POS</p></div>`;
+const card = (inner: string) => `<div style="font-family:Arial,Helvetica,sans-serif;max-width:440px;margin:0 auto;padding:24px;border:1px solid #e6dccb;border-radius:12px;color:#2b2620">${inner}<p style="font-size:11px;color:#8a7f70;margin-top:24px">Clinic On the Go</p></div>`;
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('origin');
@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
       if (testMode) return json({ ok: true, sent: true, test_code: code });
       const who = people.length === 1 ? esc(people[0].name) : 'there';
       const sent = await sendMail(email, `Your PIN reset code: ${code}`,
-        `Hi ${people.length === 1 ? people[0].name : 'there'},\n\nYour code to reset your PIN for ${shop.name} on My DukaGO POS is: ${code}\n\nIt works for ${CODE_MINUTES} minutes. If you didn't ask for this, ignore this email - your PIN stays the same.`,
+        `Hi ${people.length === 1 ? people[0].name : 'there'},\n\nYour code to reset your PIN for ${shop.name} on Clinic On the Go is: ${code}\n\nIt works for ${CODE_MINUTES} minutes. If you didn't ask for this, ignore this email - your PIN stays the same.`,
         card(`<p>Hi ${who},</p><p>Your code to reset your PIN for <b>${esc(shop.name)}</b> is:</p><p style="font-size:30px;font-weight:700;letter-spacing:6px;margin:12px 0;font-family:monospace">${code}</p><p>It works for ${CODE_MINUTES} minutes. Type it on the sign-in screen, then choose your new PIN.</p><p style="color:#8a7f70;font-size:12px">Didn't ask for this? Ignore this email - your PIN stays the same.</p>`));
       if (!sent.ok) return json({ ok: false, code: 'send_failed', detail: sent.detail }, 502);
       return json({ ok: true, sent: true });
@@ -176,9 +176,9 @@ Deno.serve(async (req) => {
     // probably led them here.
     await admin.rpc('auth_attempt_clear', { p_key: 'shop:' + shop.id });
     if (!testMode && BREVO_KEY && MAIL_FROM) {
-      await sendMail(email, 'Your My DukaGO POS PIN was changed',
-        `Hi ${person.name},\n\nThe PIN for your ${person.role} account at ${shop.name} was just changed using a code sent to this email. If this wasn't you, tell your shop Admin straight away.`,
-        card(`<p>Hi ${esc(person.name)},</p><p>The PIN for your <b>${esc(person.role)}</b> account at <b>${esc(shop.name)}</b> was just changed using a code sent to this email.</p><p>If this wasn't you, tell your shop Admin straight away.</p>`)).catch(() => null);
+      await sendMail(email, 'Your Clinic On the Go PIN was changed',
+        `Hi ${person.name},\n\nThe PIN for your ${({admin:'Administrator',supervisor:'Doctor',cashier:'Nurse'} as Record<string,string>)[person.role] || person.role} account at ${shop.name} was just changed using a code sent to this email. If this wasn't you, tell your clinic Administrator straight away.`,
+        card(`<p>Hi ${esc(person.name)},</p><p>The PIN for your <b>${esc(({admin:'Administrator',supervisor:'Doctor',cashier:'Nurse'} as Record<string,string>)[person.role] || person.role)}</b> account at <b>${esc(shop.name)}</b> was just changed using a code sent to this email.</p><p>If this wasn't you, tell your clinic Administrator straight away.</p>`)).catch(() => null);
     }
     return json({ ok: true, name: person.name, role: person.role, staffId: person.id, shop: { id: shop.id, name: shop.name, shop_code: shop.shop_code } });
   } catch (e) {

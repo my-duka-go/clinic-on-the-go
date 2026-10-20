@@ -237,7 +237,7 @@ Deno.serve(async (req) => {
       const plan = PLANS.includes(String(body.plan || '')) ? String(body.plan) : 'small';
       const trialEnds = new Date(Date.now() + TRIAL_DAYS * 86400000).toISOString();
       if (!ex) {
-        const { error } = await admin.from('shops').insert({ id: shopId, name: String(body.name || 'New shop').slice(0, 120), plan, license_status: 'trial', license_expires_at: trialEnds });
+        const { error } = await admin.from('shops').insert({ id: shopId, name: String(body.name || 'New clinic').slice(0, 120), plan, license_status: 'trial', license_expires_at: trialEnds });
         if (error) return json({ ok: false, code: 'server_error', detail: error.message }, 500);
       } else {
         // A shop row left behind by an earlier unfinished setup, with no licence dates yet: start its trial now.

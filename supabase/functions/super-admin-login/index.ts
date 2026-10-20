@@ -68,8 +68,7 @@ Deno.serve(async (req) => {
     const { data: ph, error: he } = await admin.rpc('pin_hash', { p_pin: pin });
     if (he || !ph) return json({ ok: false, error: 'Could not check the PIN' }, 500);
     // The plain form is still accepted only until supabase/rate_limits.sql has scrambled the stored PIN.
-    let { data, error } = await admin.from('platform_admins').select('id, name, email, phone, active').eq('pin', ph).maybeSingle();
-    if (!error && !data) ({ data, error } = await admin.from('platform_admins').select('id, name, email, phone, active').eq('pin', pin).maybeSingle());
+    const { data, error } = await admin.from('platform_admins').select('id, name, email, phone, active').eq('pin', ph).maybeSingle();
     if (error || !data || data.active === false) return json({ ok: false, error: 'Incorrect PIN' }, 401);
     await admin.rpc('auth_attempt_clear', { p_key: ipKey });
 
