@@ -151,7 +151,7 @@ create or replace function public.plan_device_limit(p_plan text) returns integer
   select case coalesce(p_plan, 'small') when 'medium' then 3 when 'large' then 5 when 'xl' then 100000 else 2 end
 $function$;
 create or replace function public.plan_monthly_price(p_plan text) returns numeric language sql immutable set search_path to 'public' as $function$
-  select (case coalesce(p_plan, 'small') when 'medium' then 1000 when 'large' then 1500 when 'xl' then 2500 else 500 end)::numeric
+  select (case coalesce(p_plan, 'small') when 'medium' then 1500 when 'large' then 1800 when 'xl' then 2500 else 1200 end)::numeric
 $function$;
 create or replace function public.plan_yearly_price(p_plan text) returns numeric language sql immutable set search_path to 'public' as $function$
   select round(public.plan_monthly_price(p_plan) * 12 * 0.90)

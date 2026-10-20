@@ -28,6 +28,10 @@ stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, setting
   change of each field wins and visit/appointment timelines (`log`, `history`) keep entries from both (build 11).
 - A phone moved to another clinic forgets everything of the old one (suppliers, profile, VAT, backup file) and restarts
   once after the first sign-in (build 11).
+- Plans (build 12, app and server `plan_monthly_price`): small KSh 1,200 / month (2 phones), medium 1,500 (3),
+  health centre 1,800 (5), 6+ devices 2,500; a year is 12 months less 10%.
+- First setup is step by step (PIN, confirm, email, plan); a setup that stops part way opens on the same step next time
+  (kept on the phone 24 hours, "Start over" clears it) (build 12).
 - Platform Administrator is set. Still to set: Brevo email secrets (`BREVO_API_KEY`, `MAIL_FROM`) for "Forgot PIN?".
 
 ## Data (phone database now, Supabase tables in stage 6; every row has `clinic_id`)
