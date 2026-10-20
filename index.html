@@ -3098,6 +3098,8 @@ async function pinLocalSignIn(u,pin,t){
   $('ptFormCancel').addEventListener('click', () => $('ptBackBtn').click());
   $('ptSaveBtn').addEventListener('click', () => savePatient().catch(e => { $('ptError').textContent = 'Could not save: ' + (e && e.message || e); }));
   ['ptPhone', 'ptKinPhone'].forEach(id => $(id).addEventListener('input', e => { const v = digits(e.target.value).slice(0, 10); if (v !== e.target.value) e.target.value = v; }));
+  // a fixed mistake clears the message (and any duplicate warning, so Save checks again)
+  ['input', 'change'].forEach(ev => $('ptFormPane').addEventListener(ev, () => { $('ptError').textContent = ''; delete $('ptSaveBtn').dataset.dupOk; }));
   $('ptAge').addEventListener('input', () => { if ($('ptAge').value) $('ptDob').value = ''; });
   $('ptDob').addEventListener('input', () => { if ($('ptDob').value) $('ptAge').value = ''; });
 })();
