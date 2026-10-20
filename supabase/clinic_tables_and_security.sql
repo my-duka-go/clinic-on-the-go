@@ -1,3 +1,4 @@
+-- Safe to run again: existing rules are replaced, existing tables and keys are kept.
 -- Clinic On the Go - clinic tables, row-level security, grants, the PIN key and the hourly licence check.
 
 -- ---------- clinic records ----------
@@ -52,15 +53,23 @@ end $$;
 do $$ declare t text; begin
   foreach t in array array['audit_log','cart_removal_requests','customer_debts','payables','po_number_counters','products','purchase_orders',
     'refunds','sales','shop_settings','staff_cash','stock_movements','stock_takes','table_orders','patients','visits','appointments','dispensing'] loop
+    execute format('drop policy if exists shop_isolation on public.%I', t);
     execute format('create policy shop_isolation on public.%I as permissive for all to authenticated using (shop_id = public.jwt_shop_id()) with check (shop_id = public.jwt_shop_id())', t);
   end loop;
 end $$;
+drop policy if exists shop_isolation on public.product_tombstones;
 create policy shop_isolation on public.product_tombstones as permissive for all to authenticated using (shop_id = public.jwt_shop_id()) with check (shop_id = public.jwt_shop_id());
+drop policy if exists staff_read on public.staff;
 create policy staff_read on public.staff as permissive for select to authenticated using (shop_id = public.jwt_shop_id());
+drop policy if exists staff_write on public.staff;
 create policy staff_write on public.staff as permissive for all to authenticated using (shop_id = public.jwt_shop_id() and public.jwt_role() = 'admin') with check (shop_id = public.jwt_shop_id() and public.jwt_role() = 'admin');
+drop policy if exists shop_read_own on public.shops;
 create policy shop_read_own on public.shops as permissive for select to authenticated using (id = public.jwt_shop_id());
+drop policy if exists mpesa_req_read on public.mpesa_requests;
 create policy mpesa_req_read on public.mpesa_requests as permissive for select to authenticated using (shop_id = public.jwt_shop_id());
+drop policy if exists pbt_read on public.platform_business_types;
 create policy pbt_read on public.platform_business_types as permissive for select to authenticated using (true);
+drop policy if exists shop_pay_read on public.shop_payments;
 create policy shop_pay_read on public.shop_payments as permissive for select to authenticated using (shop_id = public.jwt_shop_id());
 
 -- ---------- grants: nothing for anonymous callers; signed-in staff only through the policies above ----------

@@ -489,10 +489,10 @@ begin
 end $function$;
 
 -- ---------- triggers ----------
-create trigger a_staff_pin_scramble before insert or update of pin on public.staff for each row execute function public.scramble_staff_pin();
-create trigger staff_pin_prefix_check before insert or update of pin, active on public.staff for each row execute function public.check_pin_prefix_collision();
-create trigger staff_auth_sync after delete or update of role, active, shop_id on public.staff for each row execute function public.sync_staff_auth();
-create trigger a_platform_pin_scramble before insert or update of pin on public.platform_admins for each row execute function public.scramble_staff_pin();
-create trigger license_request_decided before update on public.license_payment_requests for each row execute function public.license_request_decided();
-create trigger products_tombstone_add after delete on public.products for each row execute function public.product_tombstone_add();
-create trigger products_tombstone_clear after insert or update of sku on public.products for each row execute function public.product_tombstone_clear();
+create or replace trigger a_staff_pin_scramble before insert or update of pin on public.staff for each row execute function public.scramble_staff_pin();
+create or replace trigger staff_pin_prefix_check before insert or update of pin, active on public.staff for each row execute function public.check_pin_prefix_collision();
+create or replace trigger staff_auth_sync after delete or update of role, active, shop_id on public.staff for each row execute function public.sync_staff_auth();
+create or replace trigger a_platform_pin_scramble before insert or update of pin on public.platform_admins for each row execute function public.scramble_staff_pin();
+create or replace trigger license_request_decided before update on public.license_payment_requests for each row execute function public.license_request_decided();
+create or replace trigger products_tombstone_add after delete on public.products for each row execute function public.product_tombstone_add();
+create or replace trigger products_tombstone_clear after insert or update of sku on public.products for each row execute function public.product_tombstone_clear();

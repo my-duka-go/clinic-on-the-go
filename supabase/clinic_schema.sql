@@ -1,6 +1,7 @@
 -- Clinic On the Go - complete database for the clinic's own Supabase project (hugaqzeqefzzpsvaanfm).
 -- Part 1: the POS foundation, copied from the live My DukaGO POS database (20 Oct 2026) so the sign-in functions,
--- row-level security and sync work the same. Part 2 (clinic_tables.sql): patients, visits, appointments, dispensing.
+-- row-level security and sync work the same. Part 2 (clinic_tables_and_security.sql): patients, visits, appointments, dispensing.
+-- Safe to run again: anything that already exists is skipped.
 -- A "shop" here is a clinic; table and column names stay as in the POS so the shared code keeps working.
 
 create extension if not exists pgcrypto with schema extensions;
@@ -66,56 +67,56 @@ create table if not exists public.stock_takes (id text not null, shop_id uuid no
 create table if not exists public.table_orders (id text not null, shop_id uuid not null, label text not null, status text not null default 'open', lines jsonb not null default '[]'::jsonb, opened_by text, opened_at timestamptz not null default now(), settled_at timestamptz, settled_sale_id text, updated_at timestamptz not null default now(), bill_printed boolean default false, kitchen_round_count integer default 0);
 
 -- ---------- keys ----------
-alter table public.shops add constraint shops_pkey primary key (id);
-alter table public.audit_log add constraint audit_log_pkey primary key (id);
-alter table public.cart_removal_requests add constraint cart_removal_requests_pkey primary key (id);
-alter table public.customer_debts add constraint customer_debts_pkey primary key (id);
-alter table public.license_payment_requests add constraint license_payment_requests_pkey primary key (id);
-alter table public.mpesa_c2b_payments add constraint mpesa_c2b_payments_pkey primary key (id);
-alter table public.mpesa_requests add constraint mpesa_requests_pkey primary key (checkout_request_id);
-alter table public.payables add constraint payables_pkey primary key (id);
-alter table public.pin_reset_config add constraint pin_reset_config_pkey primary key (k);
-alter table public.pin_resets add constraint pin_resets_pkey primary key (id);
-alter table public.platform_admins add constraint platform_admins_pkey primary key (id);
-alter table public.platform_audit_log add constraint platform_audit_log_pkey primary key (id);
-alter table public.platform_business_types add constraint platform_business_types_pkey primary key (id);
-alter table public.po_number_counters add constraint po_number_counters_pkey primary key (shop_id);
-alter table public.product_tombstones add constraint product_tombstones_pkey primary key (shop_id, sku);
-alter table public.products add constraint products_pkey primary key (shop_id, sku);
-alter table public.purchase_orders add constraint purchase_orders_pkey primary key (id);
-alter table public.refunds add constraint refunds_pkey primary key (id);
-alter table public.sales add constraint sales_pkey primary key (id);
-alter table public.shop_auth_attempts add constraint shop_auth_attempts_pkey primary key (key);
-alter table public.shop_devices add constraint shop_devices_pkey primary key (shop_id, device_id);
-alter table public.shop_payments add constraint shop_payments_pkey primary key (id);
-alter table public.shop_settings add constraint shop_settings_pkey primary key (shop_id, key);
-alter table public.staff add constraint staff_pkey primary key (shop_id, id);
-alter table public.staff_auth add constraint staff_auth_pkey primary key (staff_id);
-alter table public.staff_cash add constraint staff_cash_pkey primary key (id);
-alter table public.stock_movements add constraint stock_movements_pkey primary key (id);
-alter table public.stock_ops add constraint stock_ops_pkey primary key (shop_id, op_id);
-alter table public.stock_takes add constraint stock_takes_pkey primary key (id);
-alter table public.table_orders add constraint table_orders_pkey primary key (shop_id, id);
-alter table public.mpesa_c2b_payments add constraint mpesa_c2b_payments_trans_id_key unique (trans_id);
-alter table public.platform_admins add constraint platform_admins_pin_key unique (pin);
-alter table public.staff add constraint staff_pin_unique unique (pin);
-alter table public.staff_auth add constraint staff_auth_auth_user_id_key unique (auth_user_id);
-alter table public.cart_removal_requests add constraint cart_removal_requests_shop_id_fkey foreign key (shop_id) references public.shops(id);
-alter table public.customer_debts add constraint customer_debts_shop_id_fkey foreign key (shop_id) references public.shops(id);
-alter table public.mpesa_requests add constraint mpesa_requests_shop_id_fkey foreign key (shop_id) references public.shops(id);
-alter table public.payables add constraint payables_shop_id_fkey foreign key (shop_id) references public.shops(id);
-alter table public.pin_resets add constraint pin_resets_shop_id_fkey foreign key (shop_id) references public.shops(id) on delete cascade;
-alter table public.products add constraint products_shop_id_fkey foreign key (shop_id) references public.shops(id);
-alter table public.sales add constraint sales_shop_id_fkey foreign key (shop_id) references public.shops(id);
-alter table public.shop_payments add constraint shop_payments_shop_id_fkey foreign key (shop_id) references public.shops(id) on delete cascade;
-alter table public.shop_settings add constraint shop_settings_shop_id_fkey foreign key (shop_id) references public.shops(id);
-alter table public.staff add constraint staff_shop_id_fkey foreign key (shop_id) references public.shops(id);
-alter table public.stock_movements add constraint stock_movements_shop_id_fkey foreign key (shop_id) references public.shops(id);
-alter table public.stock_takes add constraint stock_takes_shop_id_fkey foreign key (shop_id) references public.shops(id);
-alter table public.license_payment_requests add constraint license_payment_requests_status_check check (status = any (array['pending','accepted','declined']));
-alter table public.license_payment_requests add constraint license_payment_requests_months_check check (months >= 1 and months <= 24);
-alter table public.shop_devices add constraint shop_devices_status_check check (status = any (array['active','removed']));
-alter table public.shops add constraint shops_plan_check check (plan = any (array['small','medium','large','xl']));
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'shops_pkey') then execute 'alter table public.shops add constraint shops_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'audit_log_pkey') then execute 'alter table public.audit_log add constraint audit_log_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'cart_removal_requests_pkey') then execute 'alter table public.cart_removal_requests add constraint cart_removal_requests_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'customer_debts_pkey') then execute 'alter table public.customer_debts add constraint customer_debts_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'license_payment_requests_pkey') then execute 'alter table public.license_payment_requests add constraint license_payment_requests_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'mpesa_c2b_payments_pkey') then execute 'alter table public.mpesa_c2b_payments add constraint mpesa_c2b_payments_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'mpesa_requests_pkey') then execute 'alter table public.mpesa_requests add constraint mpesa_requests_pkey primary key (checkout_request_id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'payables_pkey') then execute 'alter table public.payables add constraint payables_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'pin_reset_config_pkey') then execute 'alter table public.pin_reset_config add constraint pin_reset_config_pkey primary key (k)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'pin_resets_pkey') then execute 'alter table public.pin_resets add constraint pin_resets_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'platform_admins_pkey') then execute 'alter table public.platform_admins add constraint platform_admins_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'platform_audit_log_pkey') then execute 'alter table public.platform_audit_log add constraint platform_audit_log_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'platform_business_types_pkey') then execute 'alter table public.platform_business_types add constraint platform_business_types_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'po_number_counters_pkey') then execute 'alter table public.po_number_counters add constraint po_number_counters_pkey primary key (shop_id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'product_tombstones_pkey') then execute 'alter table public.product_tombstones add constraint product_tombstones_pkey primary key (shop_id, sku)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'products_pkey') then execute 'alter table public.products add constraint products_pkey primary key (shop_id, sku)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'purchase_orders_pkey') then execute 'alter table public.purchase_orders add constraint purchase_orders_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'refunds_pkey') then execute 'alter table public.refunds add constraint refunds_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'sales_pkey') then execute 'alter table public.sales add constraint sales_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'shop_auth_attempts_pkey') then execute 'alter table public.shop_auth_attempts add constraint shop_auth_attempts_pkey primary key (key)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'shop_devices_pkey') then execute 'alter table public.shop_devices add constraint shop_devices_pkey primary key (shop_id, device_id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'shop_payments_pkey') then execute 'alter table public.shop_payments add constraint shop_payments_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'shop_settings_pkey') then execute 'alter table public.shop_settings add constraint shop_settings_pkey primary key (shop_id, key)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'staff_pkey') then execute 'alter table public.staff add constraint staff_pkey primary key (shop_id, id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'staff_auth_pkey') then execute 'alter table public.staff_auth add constraint staff_auth_pkey primary key (staff_id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'staff_cash_pkey') then execute 'alter table public.staff_cash add constraint staff_cash_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'stock_movements_pkey') then execute 'alter table public.stock_movements add constraint stock_movements_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'stock_ops_pkey') then execute 'alter table public.stock_ops add constraint stock_ops_pkey primary key (shop_id, op_id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'stock_takes_pkey') then execute 'alter table public.stock_takes add constraint stock_takes_pkey primary key (id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'table_orders_pkey') then execute 'alter table public.table_orders add constraint table_orders_pkey primary key (shop_id, id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'mpesa_c2b_payments_trans_id_key') then execute 'alter table public.mpesa_c2b_payments add constraint mpesa_c2b_payments_trans_id_key unique (trans_id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'platform_admins_pin_key') then execute 'alter table public.platform_admins add constraint platform_admins_pin_key unique (pin)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'staff_pin_unique') then execute 'alter table public.staff add constraint staff_pin_unique unique (pin)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'staff_auth_auth_user_id_key') then execute 'alter table public.staff_auth add constraint staff_auth_auth_user_id_key unique (auth_user_id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'cart_removal_requests_shop_id_fkey') then execute 'alter table public.cart_removal_requests add constraint cart_removal_requests_shop_id_fkey foreign key (shop_id) references public.shops(id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'customer_debts_shop_id_fkey') then execute 'alter table public.customer_debts add constraint customer_debts_shop_id_fkey foreign key (shop_id) references public.shops(id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'mpesa_requests_shop_id_fkey') then execute 'alter table public.mpesa_requests add constraint mpesa_requests_shop_id_fkey foreign key (shop_id) references public.shops(id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'payables_shop_id_fkey') then execute 'alter table public.payables add constraint payables_shop_id_fkey foreign key (shop_id) references public.shops(id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'pin_resets_shop_id_fkey') then execute 'alter table public.pin_resets add constraint pin_resets_shop_id_fkey foreign key (shop_id) references public.shops(id) on delete cascade'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'products_shop_id_fkey') then execute 'alter table public.products add constraint products_shop_id_fkey foreign key (shop_id) references public.shops(id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'sales_shop_id_fkey') then execute 'alter table public.sales add constraint sales_shop_id_fkey foreign key (shop_id) references public.shops(id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'shop_payments_shop_id_fkey') then execute 'alter table public.shop_payments add constraint shop_payments_shop_id_fkey foreign key (shop_id) references public.shops(id) on delete cascade'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'shop_settings_shop_id_fkey') then execute 'alter table public.shop_settings add constraint shop_settings_shop_id_fkey foreign key (shop_id) references public.shops(id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'staff_shop_id_fkey') then execute 'alter table public.staff add constraint staff_shop_id_fkey foreign key (shop_id) references public.shops(id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'stock_movements_shop_id_fkey') then execute 'alter table public.stock_movements add constraint stock_movements_shop_id_fkey foreign key (shop_id) references public.shops(id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'stock_takes_shop_id_fkey') then execute 'alter table public.stock_takes add constraint stock_takes_shop_id_fkey foreign key (shop_id) references public.shops(id)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'license_payment_requests_status_check') then execute 'alter table public.license_payment_requests add constraint license_payment_requests_status_check check (status = any (array[''pending'',''accepted'',''declined'']))'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'license_payment_requests_months_check') then execute 'alter table public.license_payment_requests add constraint license_payment_requests_months_check check (months >= 1 and months <= 24)'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'shop_devices_status_check') then execute 'alter table public.shop_devices add constraint shop_devices_status_check check (status = any (array[''active'',''removed'']))'; end if; end $$;
+do $$ begin if not exists (select 1 from pg_constraint where conname = 'shops_plan_check') then execute 'alter table public.shops add constraint shops_plan_check check (plan = any (array[''small'',''medium'',''large'',''xl'']))'; end if; end $$;
 
 create index if not exists staff_cash_shop_idx on public.staff_cash (shop_id);
 create unique index if not exists shops_shop_code_key on public.shops (shop_code);
