@@ -1,11 +1,11 @@
-// Clinic on the go — app-shell service worker
+// Clinic On the Go — app-shell service worker
 // Caches the till page + manifest so the app can be opened cold, with zero
 // network at all, after the first successful visit. This only caches the
 // app's own files — sales/stock data lives in IndexedDB (see index.html)
 // and is untouched by this file.
 
 const CACHE_PREFIX = 'clinic-otg-shell-';
-const CACHE_NAME = CACHE_PREFIX + 'v2-2026-10-20-2';
+const CACHE_NAME = CACHE_PREFIX + 'v3-2026-10-20-3';
 const SHELL_FILES = [
   './index.html',
   './manifest.json',

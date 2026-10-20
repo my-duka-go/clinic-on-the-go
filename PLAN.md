@@ -1,4 +1,4 @@
-# Clinic on the go — plan
+# Clinic On the Go — plan
 
 A clinic app for small clinics and dispensaries, built on the **My DukaGO POS** foundation (copied, not shared):
 offline-first on the phone, sync to its **own** Supabase project, staff PINs and roles, shifts, cash / M-Pesa,
@@ -11,7 +11,7 @@ stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, setting
 ## Stages
 | # | What | Status |
 |---|------|--------|
-| 1 | Copy of the POS, renamed, separate storage, **Clinic** business type (consultation, lab, procedures, pharmacy Rx / OTC) as the default | done |
+| 1 | Copy of the POS, renamed, separate storage, health photos and clinic wording throughout, **Clinic** business type (the only one) (consultation, lab, procedures, pharmacy Rx / OTC) as the default | done |
 | 2 | **Patients** — register, search, patient file with visit history, consent, access log | done |
 | 3 | **Visits & queue** — check-in → triage (vitals) → doctor (notes, diagnosis, orders) → billing → done | next |
 | 4 | **Billing & pharmacy** — a visit's fees and dispensed medicines go to the existing till; cash, M-Pesa, insurance (SHA / private) | |
@@ -34,15 +34,17 @@ stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, setting
   (`booked` / `arrived` → becomes a visit / `missed` / `cancelled`), reminder_sent.
 - The **catalogue** (services and medicines), **sales**, **stock**, **shifts**, **staff** are the POS ones.
 
-## Roles (POS roles kept, clinic ones added)
-| Role | Can |
-|------|-----|
-| Receptionist (POS "cashier") | register patients, check in, appointments, take payment |
-| Nurse | the above + triage / vitals |
-| Doctor (clinical officer) | everything clinical: notes, diagnosis, orders, prescriptions |
-| Supervisor / Admin | as in the POS (reports, stock, staff, refunds) + all of the above |
+## Roles
+Three roles, shown as **Administrator, Doctor, Nurse** everywhere on screen. Underneath they keep the POS role keys,
+so the sign-in functions, row-level security and permission checks copied from the POS work unchanged.
 
-Clinical notes are visible to clinical staff only; reception sees names, queue and bills.
+| Role on screen | Stored as | Can |
+|------|-----|-----|
+| Nurse | `cashier` | register patients, check in, triage / vitals, appointments, take payment |
+| Doctor | `supervisor` | the above + clinical notes, diagnosis, orders, prescriptions; approves removals and reviews |
+| Administrator | `admin` | everything: stock, reports, staff, refunds, settings |
+
+Clinical notes are visible to doctors and administrators; nurses see triage, the queue and bills.
 
 ## Things to decide / get right (health data)
 - Patient records are **sensitive personal data** under Kenya's Data Protection Act 2019: the clinic should register
