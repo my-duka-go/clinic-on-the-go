@@ -14,8 +14,8 @@ stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, setting
 | 1 | Copy of the POS, renamed, separate storage, health photos and clinic wording throughout, **Clinic** business type (the only one) (consultation, lab, procedures, pharmacy Rx / OTC) as the default | done |
 | 2 | **Patients** — register, search, patient file with visit history, consent, access log | done |
 | 3 | **Visits & queue** — check-in (reason, payer, ticket no.) → vitals (out-of-range flagged) → doctor (history, exam, diagnosis, plan, orders, dosing) → bill at the desk → done; cancel with a reason; notes visible to doctors / administrators only. Until stage 6 the queue lives on one phone | done |
-| 4 | **Billing & pharmacy** — patient name on the bill and receipt, insurance (SHA / private) claims, printed prescription labels, dispensing log | next |
-| 5 | **Appointments** — book, day list, check an appointment in as a visit | |
+| 4 | **Billing & pharmacy** — patient and visit on the bill and receipt; **Insurance** payment (SHA / private) records a claim the insurer owes — never cash in the drawer — tracked on **Insurance Claims** (to submit → submitted → paid, or rejected → owed by the patient) with a printable claim summary; prescription-only medicines need a doctor's order (or a doctor at the desk, logged); **Dispensing** record; printed medicine labels | done |
+| 5 | **Appointments** — book, day list, check an appointment in as a visit | next |
 | 6 | **Own Supabase project** — tables + row-level security per clinic, sign-in functions (copied from the POS), deploy | needs the project |
 
 ## Data (phone database now, Supabase tables in stage 6; every row has `clinic_id`)
@@ -32,7 +32,11 @@ stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, setting
   (item, dose, frequency, days, quantity), doctor_id, signed_at.
 - **appointments**: id, clinic_id, patient_id (or a new name + phone), date, time, with (staff), reason, status
   (`booked` / `arrived` → becomes a visit / `missed` / `cancelled`), reminder_sent.
-- The **catalogue** (services and medicines), **sales**, **stock**, **shifts**, **staff** are the POS ones.
+- The **catalogue** (services and medicines), **sales**, **stock**, **shifts**, **staff** are the POS ones. Sales also carry
+  patient_id, patient_name, patient_no, visit_id, visit_no (stage 6: add these columns).
+- **insurance claims**: kept in customer_debts with kind = 'claim' and a `claim` object (insurer, scheme, member_no, preauth_no,
+  claim_no, status, history, paid_ref, reject_reason); income counts when paid, like credit.
+- **dispensing**: id, ts, sku, name, qty, is_rx, dose, freq, days, prescriber, patient_*, visit_*, dispensed_by, sale_id / claim_id.
 
 ## Roles
 Three roles, shown as **Administrator, Doctor, Nurse** everywhere on screen. Underneath they keep the POS role keys,
