@@ -24,7 +24,11 @@ stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, setting
   `clinic_tables_and_security.sql`; functions in `supabase/functions/`. The app uses the project's public (anon) key.
 - A phone set up before the server existed (builds 1-8) only has its clinic on that phone; at sign-in it is offered
   "Start fresh" (clears only the clinic's data on the phone, never the POS's) so the clinic can be set up on the server.
-- Still to set: Brevo email secrets (`BREVO_API_KEY`, `MAIL_FROM`) for "Forgot PIN?"; a Platform Administrator PIN.
+- Two phones changing the same record: each field keeps the time it was last changed (`_f` in the record), the newer
+  change of each field wins and visit/appointment timelines (`log`, `history`) keep entries from both (build 11).
+- A phone moved to another clinic forgets everything of the old one (suppliers, profile, VAT, backup file) and restarts
+  once after the first sign-in (build 11).
+- Platform Administrator is set. Still to set: Brevo email secrets (`BREVO_API_KEY`, `MAIL_FROM`) for "Forgot PIN?".
 
 ## Data (phone database now, Supabase tables in stage 6; every row has `clinic_id`)
 - **patients**: id, clinic_id, patient_no (e.g. `P-00042`), full_name, sex, date_of_birth (or age), phone, national_id,
