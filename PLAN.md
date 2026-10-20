@@ -88,6 +88,8 @@ Clinical notes are visible to doctors and administrators. **Money is only for th
 (build 18): only they take payments (Cashier), see prices (tests, services, medicines), the over-the-counter till and
 receiving stock, and the day's takings. The Patient tracker is a queue board - each step with who is there (ticket and
 name, urgent in red) and the longest wait - plus seen today, in the hospital, urgent and appointments still to come.
+Every list on the hospital screens (patients, queues, appointments, stock, attendance) shows each row as a box (build 20); only
+the invoice lines stay a plain table.
 
 ## Things to decide / get right (health data)
 - Patient records are **sensitive personal data** under Kenya's Data Protection Act 2019: the clinic should register
