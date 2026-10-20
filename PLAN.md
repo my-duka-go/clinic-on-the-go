@@ -4,7 +4,7 @@ A clinic app for small clinics and dispensaries, built on the **My DukaGO POS** 
 offline-first on the phone, sync to its **own** Supabase project, staff PINs and roles, shifts, cash / M-Pesa,
 receipts, reports, stock. The POS code it started from is build 101 (Oct 2026).
 
-Served at `https://muturifrancis25-dev.github.io/clinic-on-the-go/` — the same web address as the POS, so everything
+Served at `https://my-duka-go.github.io/clinic-on-the-go/` — the same web address as the POS, so everything
 stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, settings `clinic_otg_*`, offline cache
 `clinic-otg-shell-*`, sync lock `clinic-otg-sync`). The two apps can be installed side by side on one phone.
 
