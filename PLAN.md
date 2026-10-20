@@ -13,8 +13,8 @@ stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, setting
 |---|------|--------|
 | 1 | Copy of the POS, renamed, separate storage, health photos and clinic wording throughout, **Clinic** business type (the only one) (consultation, lab, procedures, pharmacy Rx / OTC) as the default | done |
 | 2 | **Patients** — register, search, patient file with visit history, consent, access log | done |
-| 3 | **Visits & queue** — check-in → triage (vitals) → doctor (notes, diagnosis, orders) → billing → done | next |
-| 4 | **Billing & pharmacy** — a visit's fees and dispensed medicines go to the existing till; cash, M-Pesa, insurance (SHA / private) | |
+| 3 | **Visits & queue** — check-in (reason, payer, ticket no.) → vitals (out-of-range flagged) → doctor (history, exam, diagnosis, plan, orders, dosing) → bill at the desk → done; cancel with a reason; notes visible to doctors / administrators only. Until stage 6 the queue lives on one phone | done |
+| 4 | **Billing & pharmacy** — patient name on the bill and receipt, insurance (SHA / private) claims, printed prescription labels, dispensing log | next |
 | 5 | **Appointments** — book, day list, check an appointment in as a visit | |
 | 6 | **Own Supabase project** — tables + row-level security per clinic, sign-in functions (copied from the POS), deploy | needs the project |
 
