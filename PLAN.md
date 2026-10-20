@@ -15,8 +15,8 @@ stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, setting
 | 2 | **Patients** — register, search, patient file with visit history, consent, access log | done |
 | 3 | **Visits & queue** — check-in (reason, payer, ticket no.) → vitals (out-of-range flagged) → doctor (history, exam, diagnosis, plan, orders, dosing) → bill at the desk → done; cancel with a reason; notes visible to doctors / administrators only. Until stage 6 the queue lives on one phone | done |
 | 4 | **Billing & pharmacy** — patient and visit on the bill and receipt; **Insurance** payment (SHA / private) records a claim the insurer owes — never cash in the drawer — tracked on **Insurance Claims** (to submit → submitted → paid, or rejected → owed by the patient) with a printable claim summary; prescription-only medicines need a doctor's order (or a doctor at the desk, logged); **Dispensing** record; printed medicine labels | done |
-| 5 | **Appointments** — book, day list, check an appointment in as a visit | next |
-| 6 | **Own Supabase project** — tables + row-level security per clinic, sign-in functions (copied from the POS), deploy | needs the project |
+| 5 | **Appointments** — book a registered patient or a new person (name + phone), with a doctor or any doctor; clash and double-booking warnings; day list (late / missed / cancelled); reminders by SMS or WhatsApp from the phone; check in as a visit (a new person registers first); coming appointments on the patient file; doctor books a follow-up from a visit | done |
+| 6 | **Own Supabase project** — tables + row-level security per clinic, sign-in functions (copied from the POS), deploy | next - needs the project |
 
 ## Data (phone database now, Supabase tables in stage 6; every row has `clinic_id`)
 - **patients**: id, clinic_id, patient_no (e.g. `P-00042`), full_name, sex, date_of_birth (or age), phone, national_id,
@@ -56,4 +56,4 @@ Clinical notes are visible to doctors and administrators; nurses see triage, the
   (who opened what, when). The privacy and terms pages copied from the POS must be rewritten for a clinic before
   real patients are entered.
 - Lab results entry and printable patient summary / referral letter — after the first version.
-- SMS appointment reminders — needs an SMS provider (Africa's Talking or similar) and its cost.
+- Automatic SMS appointment reminders — needs an SMS provider (Africa's Talking or similar) and its cost; until then reminders are sent by hand from the phone's SMS / WhatsApp.
