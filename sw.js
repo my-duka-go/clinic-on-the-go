@@ -5,7 +5,7 @@
 // and is untouched by this file.
 
 const CACHE_PREFIX = 'clinic-otg-shell-';
-const CACHE_NAME = CACHE_PREFIX + 'v9-2026-10-20-15';
+const CACHE_NAME = CACHE_PREFIX + 'v9-2026-10-20-16';
 const SHELL_FILES = [
   './index.html',
   './manifest.json',

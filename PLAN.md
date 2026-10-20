@@ -33,6 +33,10 @@ stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, setting
   health centre 1,800 (5), 6+ devices 2,500; a year is 12 months less 10%.
 - First setup is step by step (PIN, confirm, email, plan); a setup that stops part way opens on the same step next time
   (kept on the phone 24 hours, "Start over" clears it) (build 12).
+- Setup email is required (build 16, POS build 106 too) - no skipping; it is how a forgotten Admin PIN is reset.
+- Appointment reminders (build 16): staff can have a phone number (Back office → Staff); the Appointments screen sends
+  a doctor today's list, or one booking, and the patient a reminder on WhatsApp (the message opens ready to send on the
+  phone); a doctor is told about today's appointments after starting the shift, and Consultation lists them.
 - Platform Administrator is set. Still to set: Brevo email secrets (`BREVO_API_KEY`, `MAIL_FROM`) for "Forgot PIN?".
 
 ## Data (phone database now, Supabase tables in stage 6; every row has `clinic_id`)

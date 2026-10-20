@@ -95,3 +95,6 @@ select vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'), 'pin_
 
 -- ---------- hourly: switch off clinics more than 7 days past their paid-until date ----------
 select cron.schedule('suspend-expired-shops', '15 * * * *', 'select public.suspend_expired_shops();');
+
+-- ---------- staff phone (build 16): WhatsApp appointment reminders to doctors ----------
+alter table public.staff add column if not exists phone text;
