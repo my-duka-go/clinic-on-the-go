@@ -56,14 +56,23 @@ stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, setting
 - **dispensing**: id, ts, sku, name, qty, is_rx, dose, freq, days, prescriber, patient_*, visit_*, dispensed_by, sale_id / claim_id.
 
 ## Roles
-Three roles, shown as **Administrator, Doctor, Nurse** everywhere on screen. Underneath they keep the POS role keys,
-so the sign-in functions, row-level security and permission checks copied from the POS work unchanged.
+Five roles (build 15). Doctor, Nurse and Administrator keep the POS role keys, so the sign-in functions, row-level
+security and permission checks copied from the POS work unchanged; the two new ones are plain keys the server passes
+through.
 
-| Role on screen | Stored as | Can |
-|------|-----|-----|
-| Nurse | `cashier` | register patients, check in, triage / vitals, appointments, take payment |
-| Doctor | `supervisor` | the above + clinical notes, diagnosis, orders, prescriptions; approves removals and reviews |
-| Administrator | `admin` | everything: stock, reports, staff, refunds, settings |
+| Role on screen | Stored as | Sees on the hospital screen | Start of shift |
+|------|-----|-----|-----|
+| Receptionist | `receptionist` | Reception (register, start a visit), Appointments, Triage queue (the nurse takes the vitals) | clock in |
+| Nurse | `cashier` | everything except the back office | clock in |
+| Doctor | `supervisor` | everything except the back office; only a doctor calls patients in and writes notes | clock in |
+| Pharmacist | `pharmacist` | Pharmacy (dispense, over-the-counter till) and Cashier | counts the cash drawer (the POS cash shift) |
+| Administrator | `admin` | everything, plus Attendance and the Back office | clock in |
+
+**Time on duty.** Everyone records the start and end of work: the pharmacist through the POS cash shift (float at the
+start, cash-up at the end), everyone else with a clock-in ("Start your shift", the time is recorded) and **Shift → End
+shift**. Both are the audit records "Shift started" / "Shift ended", which every phone receives, so the administrator's
+**Attendance** screen shows who is on duty now, every shift (start, end, hours) and hours per person, from all phones. A
+shift not ended by the next day is closed as "Not ended" when the person next starts work.
 
 Clinical notes are visible to doctors and administrators; nurses see triage, the queue and bills.
 

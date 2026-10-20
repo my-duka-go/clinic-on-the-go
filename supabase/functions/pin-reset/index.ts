@@ -177,8 +177,8 @@ Deno.serve(async (req) => {
     await admin.rpc('auth_attempt_clear', { p_key: 'shop:' + shop.id });
     if (!testMode && BREVO_KEY && MAIL_FROM) {
       await sendMail(email, 'Your Clinic On the Go PIN was changed',
-        `Hi ${person.name},\n\nThe PIN for your ${({admin:'Administrator',supervisor:'Doctor',cashier:'Nurse'} as Record<string,string>)[person.role] || person.role} account at ${shop.name} was just changed using a code sent to this email. If this wasn't you, tell your clinic Administrator straight away.`,
-        card(`<p>Hi ${esc(person.name)},</p><p>The PIN for your <b>${esc(({admin:'Administrator',supervisor:'Doctor',cashier:'Nurse'} as Record<string,string>)[person.role] || person.role)}</b> account at <b>${esc(shop.name)}</b> was just changed using a code sent to this email.</p><p>If this wasn't you, tell your clinic Administrator straight away.</p>`)).catch(() => null);
+        `Hi ${person.name},\n\nThe PIN for your ${({admin:'Administrator',supervisor:'Doctor',cashier:'Nurse',receptionist:'Receptionist',pharmacist:'Pharmacist'} as Record<string,string>)[person.role] || person.role} account at ${shop.name} was just changed using a code sent to this email. If this wasn't you, tell your clinic Administrator straight away.`,
+        card(`<p>Hi ${esc(person.name)},</p><p>The PIN for your <b>${esc(({admin:'Administrator',supervisor:'Doctor',cashier:'Nurse',receptionist:'Receptionist',pharmacist:'Pharmacist'} as Record<string,string>)[person.role] || person.role)}</b> account at <b>${esc(shop.name)}</b> was just changed using a code sent to this email.</p><p>If this wasn't you, tell your clinic Administrator straight away.</p>`)).catch(() => null);
     }
     return json({ ok: true, name: person.name, role: person.role, staffId: person.id, shop: { id: shop.id, name: shop.name, shop_code: shop.shop_code } });
   } catch (e) {
