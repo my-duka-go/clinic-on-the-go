@@ -19,6 +19,11 @@ stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, setting
 | 5b | **Full hospital flow** (from the Hospitali Ndogo reference, without the ward) — **Patient tracker**: today's numbers and one tab per step: Triage → Doctor → Lab → Cashier → Pharmacy → Done, plus a timeline on every visit. Dangerous vitals make the patient **urgent** (front of the doctor queue); the doctor **sends to the lab**, results bring the patient **back to the doctor** ("Results back"); the prescription reaches the **pharmacy** as soon as the doctor finishes (prepare + allergy check), the patient pays at the cashier, then the pharmacy gives it out. **Allergy checks** by medicine class; **insurance cover %** with the patient's co-pay | done |
 | 6 | **Own Supabase project** — tables + row-level security per clinic, sign-in functions (copied from the POS), deploy | next - needs the project |
 
+## Before Supabase is connected (local-only mode)
+With no backend configured the app runs on one phone: the first Administrator sets the clinic up, staff PINs are checked
+for clashes on that phone only, and nothing syncs. Once stage 6 connects the clinic's Supabase project, sign-in, PIN
+checks and registration go through the server as before, and the local records are uploaded once.
+
 ## Data (phone database now, Supabase tables in stage 6; every row has `clinic_id`)
 - **patients**: id, clinic_id, patient_no (e.g. `P-00042`), full_name, sex, date_of_birth (or age), phone, national_id,
   sha_no (Social Health Authority), insurer + member_no, next_of_kin (name, phone), allergies, chronic_conditions,
