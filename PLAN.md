@@ -37,6 +37,12 @@ stored on the phone uses clinic-only names (database `clinic_otg_db_v1`, setting
 - Appointment reminders (build 16): staff can have a phone number (Back office → Staff); the Appointments screen sends
   a doctor today's list, or one booking, and the patient a reminder on WhatsApp (the message opens ready to send on the
   phone); a doctor is told about today's appointments after starting the shift, and Consultation lists them.
+- Registration (build 17): every field is required (allergies / conditions accept "None"); phones are 10 digits starting
+  07 or 01. The payment method comes first - Cash / M-Pesa, SHA (number, cover active, cover %) or private insurance
+  (insurer, member no., cover active, cover %); cover not active is refused (register as cash). Under 18 (from the date
+  of birth or age) asks for the parent / guardian's name, relationship and phone, and the patient's own phone is
+  optional. The visit starts with the patient's payment method; at the cashier SHA uses the patient's cover % (no longer
+  fixed at 100%) and the rest is paid by cash or M-Pesa ("Balance paid by").
 - Platform Administrator is set. Still to set: Brevo email secrets (`BREVO_API_KEY`, `MAIL_FROM`) for "Forgot PIN?".
 
 ## Data (phone database now, Supabase tables in stage 6; every row has `clinic_id`)
