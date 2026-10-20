@@ -73,8 +73,8 @@ through.
 | Role on screen | Stored as | Sees on the hospital screen | Start of shift |
 |------|-----|-----|-----|
 | Receptionist | `receptionist` | Reception (register, start a visit), Appointments, Triage queue (the nurse takes the vitals) | clock in |
-| Nurse | `cashier` | everything except the back office | clock in |
-| Doctor | `supervisor` | everything except the back office; only a doctor calls patients in and writes notes | clock in |
+| Nurse | `cashier` | everything except the back office and the Cashier; no prices or money anywhere | clock in |
+| Doctor | `supervisor` | everything except the back office and the Cashier, no prices or money; only a doctor calls patients in and writes notes | clock in |
 | Pharmacist | `pharmacist` | Pharmacy (dispense, over-the-counter till) and Cashier | counts the cash drawer (the POS cash shift) |
 | Administrator | `admin` | everything, plus Attendance and the Back office | clock in |
 
@@ -84,7 +84,10 @@ shift**. Both are the audit records "Shift started" / "Shift ended", which every
 **Attendance** screen shows who is on duty now, every shift (start, end, hours) and hours per person, from all phones. A
 shift not ended by the next day is closed as "Not ended" when the person next starts work.
 
-Clinical notes are visible to doctors and administrators; nurses see triage, the queue and bills.
+Clinical notes are visible to doctors and administrators. **Money is only for the pharmacist and the administrator**
+(build 18): only they take payments (Cashier), see prices (tests, services, medicines), the over-the-counter till and
+receiving stock, and the day's takings. The Patient tracker is a queue board - each step with who is there (ticket and
+name, urgent in red) and the longest wait - plus seen today, in the hospital, urgent and appointments still to come.
 
 ## Things to decide / get right (health data)
 - Patient records are **sensitive personal data** under Kenya's Data Protection Act 2019: the clinic should register
