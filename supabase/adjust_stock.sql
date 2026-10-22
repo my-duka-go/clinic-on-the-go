@@ -1,4 +1,4 @@
--- Atomic stock adjustment for My DukaGO POS.
+-- Atomic stock adjustment for Clinic On the Go (CLINIC project hugaqzeqefzzpsvaanfm; copied from the POS).
 --
 -- WHY THIS EXISTS: a sale (or a refund restocking items) used to work by reading a product's
 -- current stock on the device, subtracting/adding locally, and pushing the resulting ABSOLUTE

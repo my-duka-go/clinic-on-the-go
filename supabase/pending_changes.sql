@@ -1,4 +1,5 @@
--- Run this whole file once in the Supabase SQL editor (project duoshfyiiplvtoasxghn).
+-- Clinic On the Go: run in the CLINIC project (hugaqzeqefzzpsvaanfm) only - never in the POS project.
+-- (Copied from the POS; already part of clinic_schema.sql.)
 -- 1) Audit log shared across a shop's devices (so an admin sees what other phones did).
 create table if not exists public.audit_log (id text primary key, shop_id uuid not null, ts timestamptz not null default now(), actor text, role text, action text, details text);
 create index if not exists audit_log_shop_ts on public.audit_log (shop_id, ts desc);
