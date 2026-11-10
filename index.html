@@ -6929,5 +6929,6 @@ html[data-theme="dark"] .view input:not([type=checkbox]):not([type=radio]),html[
   setTimeout(tryMove, 8000); setInterval(tryMove, 60000);
 })();
 </script>
+<script>(function(){var IURL='https://duoshfyiiplvtoasxghn.supabase.co/functions/v1/app-install';var IKEY='sb_publishable_TLFyMJjbKSyTKmVOJEb0Ug_zDl9CuLX';var APP='clinic';function devId(){try{var d=localStorage.getItem('dg_dev');if(!d){d=Date.now().toString(36)+Math.random().toString(36).slice(2,8);localStorage.setItem('dg_dev',d);}return d;}catch(e){return null;}}function ping(ev){try{var acct='';try{acct=(window.currentClinic&&(currentClinic.name||currentClinic.clinic_name))||localStorage.getItem('clinic_name')||'';}catch(e){}fetch(IURL,{method:'POST',headers:{apikey:IKEY,Authorization:'Bearer '+IKEY,'Content-Type':'application/json'},body:JSON.stringify({app:APP,event:ev,device_id:devId(),account:acct})}).catch(function(){});}catch(e){}}try{if(!localStorage.getItem('dg_opened')){localStorage.setItem('dg_opened','1');ping('first_open');}}catch(e){}try{window.addEventListener('appinstalled',function(){ping('installed');});}catch(e){}})();</script>
 </body>
 </html>
