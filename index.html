@@ -6930,5 +6930,369 @@ html[data-theme="dark"] .view input:not([type=checkbox]):not([type=radio]),html[
 })();
 </script>
 <script>(function(){var IURL='https://duoshfyiiplvtoasxghn.supabase.co/functions/v1/app-install';var IKEY='sb_publishable_TLFyMJjbKSyTKmVOJEb0Ug_zDl9CuLX';var APP='clinic';function devId(){try{var d=localStorage.getItem('dg_dev');if(!d){d=Date.now().toString(36)+Math.random().toString(36).slice(2,8);localStorage.setItem('dg_dev',d);}return d;}catch(e){return null;}}function ping(ev){try{var acct='';try{acct=(window.currentClinic&&(currentClinic.name||currentClinic.clinic_name))||localStorage.getItem('clinic_name')||'';}catch(e){}fetch(IURL,{method:'POST',headers:{apikey:IKEY,Authorization:'Bearer '+IKEY,'Content-Type':'application/json'},body:JSON.stringify({app:APP,event:ev,device_id:devId(),account:acct})}).catch(function(){});}catch(e){}}try{if(!localStorage.getItem('dg_opened')){localStorage.setItem('dg_opened','1');ping('first_open');}}catch(e){}try{window.addEventListener('appinstalled',function(){ping('installed');});}catch(e){}})();</script>
+<script>
+/* ================= DukaGO Clinic — HR (Payroll + Leave), admin-only, online v1 ================= */
+(function () {
+  if (window.__hrLoaded) return; window.__hrLoaded = true;
+
+  /* ---- Kenya payroll engine (unit-tested; rates editable via settings) ---- */
+  var PAY_CFG = {
+    payeBands: [{ upTo: 24000, rate: .10 }, { upTo: 32333, rate: .25 }, { upTo: 500000, rate: .30 }, { upTo: 800000, rate: .325 }, { upTo: Infinity, rate: .35 }],
+    personalRelief: 2400, nssfRate: .06, nssfCeiling: 108000, shifRate: .0275, shifMin: 300, housingRate: .015
+  };
+  var r2 = function (n) { return Math.round((n + Number.EPSILON) * 100) / 100; };
+  function bandTax(taxable, bands) { var tax = 0, lower = 0; for (var i = 0; i < bands.length; i++) { var b = bands[i]; if (taxable <= lower) break; var slice = Math.min(taxable, b.upTo) - lower; if (slice > 0) tax += slice * b.rate; lower = b.upTo; } return tax; }
+  function computePayroll(gross, otherDed, cfg) {
+    cfg = cfg || PAY_CFG; gross = Number(gross) || 0; var other = Number(otherDed) || 0;
+    var nssf = r2(cfg.nssfRate * Math.min(gross, cfg.nssfCeiling));
+    var shif = r2(Math.max(cfg.shifMin, cfg.shifRate * gross));
+    var housing = r2(cfg.housingRate * gross);
+    var taxable = r2(gross - nssf - shif - housing);
+    var paye = r2(Math.max(0, bandTax(Math.max(0, taxable), cfg.payeBands) - cfg.personalRelief));
+    var statutory = r2(paye + nssf + shif + housing);
+    var net = r2(gross - statutory - other);
+    return { gross: r2(gross), nssf: nssf, shif: shif, housing: housing, taxable: taxable, paye: paye, statutory: statutory, otherDeductions: r2(other), net: net };
+  }
+
+  /* ---- helpers (reuse the app's globals) ---- */
+  var SID = function () { return (typeof shopId !== 'undefined' && shopId) || null; };
+  var H = function (extra) { return (typeof sbHeaders === 'function') ? sbHeaders(extra) : Object.assign({ 'Content-Type': 'application/json' }, extra || {}); };
+  var URLB = function () { return (typeof supaUrl !== 'undefined' && supaUrl) || ''; };
+  var F = function (u, o) { return (typeof fetchT === 'function') ? fetchT(u, o, 15000) : fetch(u, o); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var money = function (n) { n = Number(n) || 0; return n.toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var uid = function () { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); };
+  var toast = function (m) { try { if (typeof window.toast === 'function') return window.toast(m); } catch (e) {} };
+  var who = function () { try { return (typeof window.who === 'function') ? window.who() : (typeof currentUser !== 'undefined' && currentUser ? currentUser.name : 'Admin'); } catch (e) { return 'Admin'; } };
+  var isAdm = function () { try { return (typeof isAdmin === 'function') ? isAdmin() : (typeof currentUser !== 'undefined' && currentUser && currentUser.role === 'admin'); } catch (e) { return false; } };
+  var audit = function (a, d) { try { if (typeof logAudit === 'function') logAudit(a, d); } catch (e) {} };
+
+  async function api(table, q) { var u = URLB() + '/rest/v1/' + table + '?shop_id=eq.' + SID() + (q ? '&' + q : ''); var r = await F(u, { headers: H() }); if (!r.ok) throw new Error(table + ' ' + r.status); var t = await r.text(); return t ? JSON.parse(t) : []; }
+  async function upsert(table, doc, id) { id = id || doc.id || uid(); var row = { shop_id: SID(), id: id, doc: doc, updated_at: new Date().toISOString() }; var r = await F(URLB() + '/rest/v1/' + table + '?on_conflict=shop_id,id', { method: 'POST', headers: H({ Prefer: 'resolution=merge-duplicates,return=minimal' }), body: JSON.stringify([row]) }); if (!r.ok) throw new Error('save ' + table + ' ' + r.status + ' ' + (await r.text()).slice(0, 120)); return id; }
+  async function del(table, id) { var r = await F(URLB() + '/rest/v1/' + table + '?shop_id=eq.' + SID() + '&id=eq.' + encodeURIComponent(id), { method: 'DELETE', headers: H() }); if (!r.ok) throw new Error('delete ' + r.status); }
+
+  /* ---- state ---- */
+  var S = { tab: 'payroll', emps: [], staff: [], types: [], reqs: [], runs: [], advances: {} };
+  var ynow = function () { return new Date().getFullYear(); };
+  var thisMonth = function () { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+
+  async function loadAll() {
+    var out = await Promise.all([
+      api('hr_employees', 'select=id,doc'),
+      api('staff', 'select=id,name,role,active,phone'),
+      api('leave_types', 'select=id,doc'),
+      api('leave_requests', 'select=id,doc&order=updated_at.desc'),
+      api('payroll_runs', 'select=id,doc&order=updated_at.desc'),
+      api('staff_cash', 'kind=eq.advance&select=staff_id,amount,status').catch(function () { return []; })
+    ]);
+    S.emps = out[0].map(function (r) { return Object.assign({ id: r.id }, r.doc); });
+    S.staff = out[1] || [];
+    S.types = out[2].map(function (r) { return Object.assign({ id: r.id }, r.doc); });
+    S.reqs = out[3].map(function (r) { return Object.assign({ id: r.id }, r.doc); });
+    S.runs = out[4].map(function (r) { return Object.assign({ id: r.id }, r.doc); });
+    S.advances = {}; (out[5] || []).forEach(function (a) { if (a.status === 'rejected' || a.status === 'deducted') return; S.advances[a.staff_id] = (S.advances[a.staff_id] || 0) + (Number(a.amount) || 0); });
+    if (!S.types.length) { // seed Kenyan statutory leave types on first run
+      var seed = [['Annual', 21], ['Sick', 14], ['Maternity', 91], ['Paternity', 14], ['Compassionate', 0]];
+      for (var i = 0; i < seed.length; i++) { var t = { id: uid(), name: seed[i][0], days: seed[i][1], paid: true }; S.types.push(t); try { await upsert('leave_types', t, t.id); } catch (e) {} }
+    }
+  }
+
+  /* ---- overlay shell ---- */
+  function shell() {
+    var ov = document.getElementById('hrOverlay');
+    if (ov) return ov;
+    ov = document.createElement('div'); ov.id = 'hrOverlay'; ov.className = 'hrov';
+    ov.innerHTML =
+      '<div class="hr-top"><button class="hr-x" onclick="HR.close()">←</button><b>HR &middot; Payroll &amp; Leave</b><span class="hr-sp"></span></div>' +
+      '<div class="hr-tabs"><button data-t="payroll" class="hr-tab on">Payroll</button><button data-t="leave" class="hr-tab">Leave</button><button data-t="employees" class="hr-tab">Employees</button><button data-t="settings" class="hr-tab">Rates</button></div>' +
+      '<div class="hr-body" id="hrBody"></div>';
+    document.body.appendChild(ov);
+    ov.querySelectorAll('.hr-tab').forEach(function (b) { b.onclick = function () { S.tab = b.getAttribute('data-t'); ov.querySelectorAll('.hr-tab').forEach(function (x) { x.classList.toggle('on', x === b); }); draw(); }; });
+    return ov;
+  }
+  function draw() {
+    var b = document.getElementById('hrBody'); if (!b) return;
+    if (S.tab === 'payroll') return drawPayroll(b);
+    if (S.tab === 'leave') return drawLeave(b);
+    if (S.tab === 'employees') return drawEmployees(b);
+    if (S.tab === 'settings') return drawSettings(b);
+  }
+
+  /* ---- Employees ---- */
+  function empName(e) { if (e.name) return e.name; var s = S.staff.find(function (x) { return x.id === e.staff_id; }); return s ? s.name : 'Unnamed'; }
+  function gross(e) { var a = (e.allowances || []).reduce(function (s, x) { return s + (Number(x.amount) || 0); }, 0); return (Number(e.basic) || 0) + a; }
+  function drawEmployees(b) {
+    var rows = S.emps.map(function (e) {
+      return '<div class="hr-row"><div class="hr-grow"><div class="hr-t">' + esc(empName(e)) + '</div><div class="hr-s">' + esc(e.title || e.role || '') + ' &middot; gross KES ' + money(gross(e)) + (e.active === false ? ' &middot; <span style="color:#e88">inactive</span>' : '') + '</div></div><button class="hr-btn" onclick="HR.editEmp(\'' + e.id + '\')">Edit</button></div>';
+    }).join('') || '<div class="hr-empty">No employees yet. Add your staff’s pay details to run payroll.</div>';
+    b.innerHTML = '<div class="hr-head"><h3>Employees</h3><button class="hr-btn pri" onclick="HR.editEmp()">+ Add employee</button></div>' + rows;
+  }
+  function editEmp(id) {
+    var e = id ? S.emps.find(function (x) { return x.id === id; }) : { id: uid(), allowances: [], active: true };
+    var staffOpts = '<option value="">— not an app user —</option>' + S.staff.map(function (s) { return '<option value="' + s.id + '"' + (e.staff_id === s.id ? ' selected' : '') + '>' + esc(s.name) + ' (' + esc(s.role) + ')</option>'; }).join('');
+    var allowRows = (e.allowances || []).map(function (a, i) { return '<div class="hr-allow"><input placeholder="Allowance" value="' + esc(a.label || '') + '" data-ai="' + i + '" data-af="label"><input type="number" placeholder="Amount" value="' + (a.amount || '') + '" data-ai="' + i + '" data-af="amount"><button class="hr-del" data-rm="' + i + '">×</button></div>'; }).join('');
+    modal((id ? 'Edit' : 'Add') + ' employee',
+      field('Link to staff account', '<select id="e_staff">' + staffOpts + '</select>') +
+      field('Name (if not a staff account)', '<input id="e_name" value="' + esc(e.name || '') + '" placeholder="Full name">') +
+      field('Job title', '<input id="e_title" value="' + esc(e.title || '') + '" placeholder="e.g. Nurse, Cleaner">') +
+      field('Basic salary (KES/month)', '<input id="e_basic" type="number" value="' + (e.basic || '') + '">') +
+      '<div class="hr-fld"><span>Allowances</span><div id="e_allows">' + allowRows + '</div><button class="hr-btn sm" id="e_addallow">+ allowance</button></div>' +
+      field('Other monthly deduction (SACCO, loan)', '<input id="e_otherded" type="number" value="' + (e.otherDed || '') + '">') +
+      field('KRA PIN', '<input id="e_kra" value="' + esc(e.kra || '') + '">') +
+      field('NSSF No.', '<input id="e_nssf" value="' + esc(e.nssf_no || '') + '">') +
+      field('SHIF No.', '<input id="e_shif" value="' + esc(e.shif_no || '') + '">') +
+      field('Pay to (M-Pesa / bank acc)', '<input id="e_dest" value="' + esc(e.pay_dest || '') + '" placeholder="07xx or bank a/c">') +
+      field('Phone (for payslip)', '<input id="e_phone" value="' + esc(e.phone || '') + '" placeholder="2547xxxxxxxx">') +
+      '<label class="hr-chk"><input type="checkbox" id="e_active"' + (e.active !== false ? ' checked' : '') + '> Active (include in payroll)</label>',
+      [['Cancel', 'HR.closeModal()'], ['Save', 'HR.saveEmp(\'' + e.id + '\')', 'pri']].concat(id ? [['Delete', 'HR.delEmp(\'' + e.id + '\')', 'danger']] : []),
+      function (root) {
+        var al = JSON.parse(JSON.stringify(e.allowances || []));
+        function redraw() { root.querySelector('#e_allows').innerHTML = al.map(function (a, i) { return '<div class="hr-allow"><input placeholder="Allowance" value="' + esc(a.label || '') + '" data-ai="' + i + '" data-af="label"><input type="number" placeholder="Amount" value="' + (a.amount || '') + '" data-ai="' + i + '" data-af="amount"><button class="hr-del" data-rm="' + i + '">×</button></div>'; }).join(''); bindAl(); }
+        function bindAl() {
+          root.querySelectorAll('[data-ai]').forEach(function (inp) { inp.oninput = function () { al[+inp.getAttribute('data-ai')][inp.getAttribute('data-af')] = inp.getAttribute('data-af') === 'amount' ? (+inp.value || 0) : inp.value; }; });
+          root.querySelectorAll('[data-rm]').forEach(function (btn) { btn.onclick = function () { al.splice(+btn.getAttribute('data-rm'), 1); redraw(); }; });
+        }
+        bindAl();
+        root.querySelector('#e_addallow').onclick = function () { al.push({ label: '', amount: 0 }); redraw(); };
+        root.__getAllows = function () { return al.filter(function (a) { return a.label || a.amount; }); };
+      });
+  }
+  async function saveEmp(id) {
+    var root = document.getElementById('hrModal');
+    var e = S.emps.find(function (x) { return x.id === id; }) || { id: id };
+    e.staff_id = root.querySelector('#e_staff').value || null;
+    e.name = root.querySelector('#e_name').value.trim();
+    e.title = root.querySelector('#e_title').value.trim();
+    e.basic = +root.querySelector('#e_basic').value || 0;
+    e.allowances = root.__getAllows ? root.__getAllows() : (e.allowances || []);
+    e.otherDed = +root.querySelector('#e_otherded').value || 0;
+    e.kra = root.querySelector('#e_kra').value.trim();
+    e.nssf_no = root.querySelector('#e_nssf').value.trim();
+    e.shif_no = root.querySelector('#e_shif').value.trim();
+    e.pay_dest = root.querySelector('#e_dest').value.trim();
+    e.phone = root.querySelector('#e_phone').value.trim();
+    e.active = root.querySelector('#e_active').checked;
+    if (!e.name && !e.staff_id) return toast('Pick a staff account or enter a name');
+    try { await upsert('hr_employees', e, e.id); if (!S.emps.find(function (x) { return x.id === e.id; })) S.emps.push(e); audit('HR: saved employee', empName(e)); closeModal(); draw(); } catch (err) { toast('Could not save: ' + err.message); }
+  }
+  async function delEmp(id) { if (!confirm('Remove this employee from HR? Past payslips are kept.')) return; try { await del('hr_employees', id); S.emps = S.emps.filter(function (x) { return x.id !== id; }); closeModal(); draw(); } catch (e) { toast('Could not delete'); } }
+
+  /* ---- Payroll ---- */
+  function drawPayroll(b) {
+    var runList = S.runs.slice(0, 12).map(function (r) {
+      return '<div class="hr-row"><div class="hr-grow"><div class="hr-t">' + esc(monthLabel(r.period)) + '</div><div class="hr-s">' + (r.count || 0) + ' staff &middot; net KES ' + money(r.totalNet || 0) + ' &middot; ' + (r.status === 'final' ? 'finalised' : 'draft') + '</div></div><button class="hr-btn" onclick="HR.viewRun(\'' + r.id + '\')">Open</button></div>';
+    }).join('') || '<div class="hr-empty">No payroll runs yet.</div>';
+    b.innerHTML = '<div class="hr-head"><h3>Payroll</h3><button class="hr-btn pri" onclick="HR.newRun()">Run payroll</button></div>' +
+      '<div class="hr-note">PAYE, NSSF, SHIF (2.75%) and Housing Levy (1.5%) are applied automatically using current KRA rates (editable under Rates).</div>' + runList;
+  }
+  function monthLabel(p) { if (!p) return ''; var a = p.split('-'); return new Date(a[0], a[1] - 1, 1).toLocaleDateString('en-KE', { month: 'long', year: 'numeric' }); }
+  function activeEmps() { return S.emps.filter(function (e) { return e.active !== false && gross(e) > 0; }); }
+  function newRun() {
+    var emps = activeEmps();
+    if (!emps.length) { toast('Add employees with a salary first'); S.tab = 'employees'; document.querySelector('.hr-tab[data-t=employees]').click(); return; }
+    var period = thisMonth();
+    var lines = emps.map(function (e) { var adv = S.advances[e.staff_id] || 0; return { emp: e, other: (e.otherDed || 0) + adv, advance: adv }; });
+    modal('Run payroll — ' + monthLabel(period),
+      field('Pay month', '<input id="r_period" type="month" value="' + period + '">') +
+      '<div class="hr-note">Advances from staff cash are pre-filled as deductions. Edit any deduction before finalising.</div>' +
+      '<div id="r_lines"></div>',
+      [['Cancel', 'HR.closeModal()'], ['Preview & save', 'HR.saveRun()', 'pri']],
+      function (root) {
+        S.__draft = { period: period, lines: lines };
+        function paint() {
+          root.querySelector('#r_lines').innerHTML = lines.map(function (l, i) {
+            var p = computePayroll(gross(l.emp), l.other);
+            return '<div class="hr-pl"><div class="hr-plh">' + esc(empName(l.emp)) + '<span>net ' + money(p.net) + '</span></div>' +
+              '<div class="hr-plg"><span>Gross ' + money(p.gross) + '</span><span>PAYE ' + money(p.paye) + '</span><span>NSSF ' + money(p.nssf) + '</span><span>SHIF ' + money(p.shif) + '</span><span>Housing ' + money(p.housing) + '</span></div>' +
+              '<label class="hr-pld">Other deduction <input type="number" data-li="' + i + '" value="' + l.other + '"></label></div>';
+          }).join('');
+          root.querySelectorAll('[data-li]').forEach(function (inp) { inp.oninput = function () { lines[+inp.getAttribute('data-li')].other = +inp.value || 0; paint(); }; });
+        }
+        root.querySelector('#r_period').onchange = function (e) { S.__draft.period = e.target.value; };
+        paint();
+      });
+  }
+  async function saveRun() {
+    var root = document.getElementById('hrModal'); var period = root.querySelector('#r_period').value; var lines = S.__draft.lines;
+    if (S.runs.find(function (r) { return r.period === period && r.status === 'final'; })) { if (!confirm('A finalised run already exists for ' + monthLabel(period) + '. Create another?')) return; }
+    var runId = uid(), slips = [], totNet = 0, totGross = 0, totPaye = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var l = lines[i], g = gross(l.emp), p = computePayroll(g, l.other);
+      totNet += p.net; totGross += p.gross; totPaye += p.paye;
+      slips.push({ id: uid(), run_id: runId, period: period, emp_id: l.emp.id, name: empName(l.emp), title: l.emp.title || '', phone: l.emp.phone || '', pay_dest: l.emp.pay_dest || '', basic: l.emp.basic || 0, allowances: l.emp.allowances || [], calc: p, created_at: new Date().toISOString(), created_by: who() });
+    }
+    var run = { id: runId, period: period, status: 'final', count: lines.length, totalNet: r2(totNet), totalGross: r2(totGross), totalPaye: r2(totPaye), created_at: new Date().toISOString(), created_by: who() };
+    try {
+      for (var j = 0; j < slips.length; j++) await upsert('payslips', slips[j], slips[j].id);
+      await upsert('payroll_runs', run, runId);
+      S.runs.unshift(run); audit('HR: ran payroll', monthLabel(period) + ' (' + lines.length + ' staff)');
+      closeModal(); S.__slips = slips; viewRun(runId, slips);
+    } catch (e) { toast('Could not save run: ' + e.message); }
+  }
+  async function viewRun(id, slipsIn) {
+    var run = S.runs.find(function (r) { return r.id === id; });
+    var slips = slipsIn;
+    if (!slips) { try { var rows = await api('payslips', 'select=id,doc&doc->>run_id=eq.' + id); slips = rows.map(function (r) { return Object.assign({ id: r.id }, r.doc); }); } catch (e) { slips = []; } }
+    var rows = slips.map(function (s) {
+      return '<div class="hr-row"><div class="hr-grow"><div class="hr-t">' + esc(s.name) + '</div><div class="hr-s">net KES ' + money(s.calc.net) + ' &middot; PAYE ' + money(s.calc.paye) + '</div></div><button class="hr-btn" onclick="HR.payslip(\'' + s.id + '\')">Payslip</button></div>';
+    }).join('');
+    S.__slips = slips;
+    modal('Payroll — ' + monthLabel(run ? run.period : ''),
+      '<div class="hr-sum"><div><b>' + money(run ? run.totalNet : 0) + '</b><span>Total net</span></div><div><b>' + money(run ? run.totalGross : 0) + '</b><span>Gross</span></div><div><b>' + money(run ? run.totalPaye : 0) + '</b><span>PAYE</span></div></div>' + rows,
+      [['Close', 'HR.closeModal()'], ['Print summary', 'HR.printRun(\'' + id + '\')', 'pri']]);
+  }
+  function slipHTML(s) {
+    var c = s.calc, al = (s.allowances || []).map(function (a) { return '<tr><td>' + esc(a.label) + '</td><td class="r">' + money(a.amount) + '</td></tr>'; }).join('');
+    return '<div class="ps"><h2>Payslip</h2><div class="psm">' + esc(monthLabel(s.period)) + '</div>' +
+      '<table class="pst"><tr><td>Employee</td><td class="r"><b>' + esc(s.name) + '</b></td></tr><tr><td>Title</td><td class="r">' + esc(s.title || '') + '</td></tr></table>' +
+      '<h4>Earnings</h4><table class="pst"><tr><td>Basic salary</td><td class="r">' + money(s.basic) + '</td></tr>' + al + '<tr class="tot"><td>Gross pay</td><td class="r">' + money(c.gross) + '</td></tr></table>' +
+      '<h4>Deductions</h4><table class="pst"><tr><td>PAYE</td><td class="r">' + money(c.paye) + '</td></tr><tr><td>NSSF</td><td class="r">' + money(c.nssf) + '</td></tr><tr><td>SHIF</td><td class="r">' + money(c.shif) + '</td></tr><tr><td>Housing Levy</td><td class="r">' + money(c.housing) + '</td></tr>' + (c.otherDeductions ? '<tr><td>Other (advance/loan)</td><td class="r">' + money(c.otherDeductions) + '</td></tr>' : '') + '<tr class="tot"><td>Total deductions</td><td class="r">' + money(c.totalDeductions) + '</td></tr></table>' +
+      '<table class="pst net"><tr><td>NET PAY</td><td class="r"><b>KES ' + money(c.net) + '</b></td></tr></table>' +
+      '<div class="psf">Pay to: ' + esc(s.pay_dest || '—') + '<br>Taxable pay KES ' + money(c.taxable) + ' &middot; Processed by ' + esc(s.created_by || '') + '</div></div>';
+  }
+  function payslip(sid) {
+    var s = (S.__slips || []).find(function (x) { return x.id === sid; }); if (!s) return;
+    modal('Payslip — ' + esc(s.name), '<div id="psWrap">' + slipHTML(s) + '</div>',
+      [['Close', 'HR.closeModal()'], ['WhatsApp', 'HR.waSlip(\'' + sid + '\')'], ['Print / PDF', 'HR.printSlip(\'' + sid + '\')', 'pri']]);
+  }
+  function printSlip(sid) { var s = (S.__slips || []).find(function (x) { return x.id === sid; }); if (s) printHTML(slipHTML(s)); }
+  function printRun(id) { var slips = S.__slips || []; printHTML('<h2>Payroll summary</h2>' + slips.map(function (s) { return '<div style="margin-bottom:14px">' + slipHTML(s) + '</div>'; }).join('')); }
+  function printHTML(inner) {
+    var w = window.open('', '_blank'); if (!w) { toast('Allow pop-ups to print'); return; }
+    w.document.write('<html><head><title>Payslip</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{font:14px system-ui;padding:16px;color:#111}.ps{max-width:420px;margin:0 auto;border:1px solid #ddd;border-radius:10px;padding:18px}h2{margin:0}.psm{color:#666;margin-bottom:10px}.pst{width:100%;border-collapse:collapse;margin:4px 0 10px}.pst td{padding:4px 2px;border-bottom:1px solid #eee}.pst .r{text-align:right}.pst .tot td{border-top:2px solid #333;font-weight:700;border-bottom:none}.net td{background:#f3f7f4;font-size:16px;padding:8px 6px}h4{margin:10px 0 2px;font-size:13px;color:#444}.psf{color:#666;font-size:12px;margin-top:10px}</style></head><body>' + inner + '<scr' + 'ipt>setTimeout(function(){window.print()},300)</scr' + 'ipt></body></html>'); w.document.close();
+  }
+  function waSlip(sid) {
+    var s = (S.__slips || []).find(function (x) { return x.id === sid; }); if (!s) return; var c = s.calc;
+    var txt = '*Payslip — ' + monthLabel(s.period) + '*\n' + s.name + (s.title ? ' (' + s.title + ')' : '') + '\n\nGross: KES ' + money(c.gross) + '\nPAYE: ' + money(c.paye) + '\nNSSF: ' + money(c.nssf) + '\nSHIF: ' + money(c.shif) + '\nHousing: ' + money(c.housing) + (c.otherDeductions ? '\nOther: ' + money(c.otherDeductions) : '') + '\n*Net pay: KES ' + money(c.net) + '*';
+    var ph = (s.phone || '').replace(/[^0-9]/g, ''); if (ph.indexOf('0') === 0) ph = '254' + ph.slice(1);
+    window.open('https://wa.me/' + (ph || '') + '?text=' + encodeURIComponent(txt), '_blank');
+  }
+
+  /* ---- Leave ---- */
+  function leaveTaken(empId, typeId) { var y = ynow(); return S.reqs.filter(function (r) { return r.emp_id === empId && r.type_id === typeId && r.status === 'approved' && (r.start || '').slice(0, 4) == y; }).reduce(function (s, r) { return s + (Number(r.days) || 0); }, 0); }
+  function drawLeave(b) {
+    var pend = S.reqs.filter(function (r) { return r.status === 'pending'; });
+    var ph = pend.length ? '<div class="hr-head"><h3>Pending requests</h3></div>' + pend.map(function (r) {
+      return '<div class="hr-row"><div class="hr-grow"><div class="hr-t">' + esc(r.name) + ' &middot; ' + esc(r.type_name) + '</div><div class="hr-s">' + esc(r.start) + ' → ' + esc(r.end) + ' &middot; ' + r.days + ' day(s)' + (r.reason ? ' &middot; ' + esc(r.reason) : '') + '</div></div><button class="hr-btn pri" onclick="HR.decide(\'' + r.id + '\',\'approved\')">Approve</button> <button class="hr-btn" onclick="HR.decide(\'' + r.id + '\',\'declined\')">Decline</button></div>';
+    }).join('') : '';
+    var bal = activeEmps().map(function (e) {
+      var cells = S.types.filter(function (t) { return t.days > 0; }).map(function (t) { var taken = leaveTaken(e.id, t.id); return '<span class="hr-bal">' + esc(t.name) + ': ' + (t.days - taken) + '/' + t.days + '</span>'; }).join(' ');
+      return '<div class="hr-row"><div class="hr-grow"><div class="hr-t">' + esc(empName(e)) + '</div><div class="hr-s">' + cells + '</div></div><button class="hr-btn" onclick="HR.reqLeave(\'' + e.id + '\')">+ Leave</button></div>';
+    }).join('') || '<div class="hr-empty">Add employees to track leave.</div>';
+    var recent = S.reqs.filter(function (r) { return r.status !== 'pending'; }).slice(0, 8).map(function (r) { return '<div class="hr-row"><div class="hr-grow"><div class="hr-t">' + esc(r.name) + ' &middot; ' + esc(r.type_name) + '</div><div class="hr-s">' + esc(r.start) + ' → ' + esc(r.end) + ' &middot; ' + r.days + 'd &middot; ' + esc(r.status) + '</div></div></div>'; }).join('');
+    b.innerHTML = ph + '<div class="hr-head"><h3>Leave balances (' + ynow() + ')</h3><button class="hr-btn sm" onclick="HR.manageTypes()">Types</button></div>' + bal + (recent ? '<div class="hr-head"><h3>Recent</h3></div>' + recent : '');
+  }
+  function reqLeave(empId) {
+    var e = S.emps.find(function (x) { return x.id === empId; }); var topts = S.types.map(function (t) { return '<option value="' + t.id + '">' + esc(t.name) + (t.days ? ' (' + (t.days - leaveTaken(empId, t.id)) + ' left)' : '') + '</option>'; }).join('');
+    modal('Leave — ' + esc(empName(e)),
+      field('Type', '<select id="l_type">' + topts + '</select>') + field('From', '<input id="l_from" type="date">') + field('To', '<input id="l_to" type="date">') + field('Reason (optional)', '<input id="l_reason">'),
+      [['Cancel', 'HR.closeModal()'], ['Submit', 'HR.saveLeave(\'' + empId + '\')', 'pri']]);
+  }
+  function daysBetween(a, b) { if (!a || !b) return 0; var d1 = new Date(a), d2 = new Date(b); var n = 0; for (var d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) { var wd = d.getDay(); if (wd !== 0) n++; } return n; } // excl Sundays
+  async function saveLeave(empId) {
+    var root = document.getElementById('hrModal'); var tId = root.querySelector('#l_type').value; var t = S.types.find(function (x) { return x.id === tId; });
+    var from = root.querySelector('#l_from').value, to = root.querySelector('#l_to').value;
+    if (!from || !to) return toast('Pick the dates'); if (to < from) return toast('End date is before start');
+    var e = S.emps.find(function (x) { return x.id === empId; });
+    var req = { id: uid(), emp_id: empId, name: empName(e), type_id: tId, type_name: t ? t.name : '', start: from, end: to, days: daysBetween(from, to), reason: root.querySelector('#l_reason').value.trim(), status: isAdm() ? 'approved' : 'pending', by: who(), created_at: new Date().toISOString() };
+    try { await upsert('leave_requests', req, req.id); S.reqs.unshift(req); audit('HR: leave ' + req.status, req.name + ' ' + req.type_name); closeModal(); draw(); } catch (err) { toast('Could not save: ' + err.message); }
+  }
+  async function decide(id, status) {
+    var r = S.reqs.find(function (x) { return x.id === id; }); if (!r) return; r.status = status; r.decided_by = who(); r.decided_at = new Date().toISOString();
+    try { await upsert('leave_requests', r, id); audit('HR: leave ' + status, r.name); draw(); } catch (e) { toast('Could not update'); }
+  }
+  function manageTypes() {
+    var rows = S.types.map(function (t) { return '<div class="hr-allow"><input value="' + esc(t.name) + '" data-ti="' + t.id + '" data-tf="name"><input type="number" value="' + (t.days || 0) + '" data-ti="' + t.id + '" data-tf="days" style="max-width:80px"><button class="hr-del" data-td="' + t.id + '">×</button></div>'; }).join('');
+    modal('Leave types', '<div class="hr-note">Days per year (0 = unlimited/unpaid tracking).</div><div id="lt_rows">' + rows + '</div><button class="hr-btn sm" id="lt_add">+ type</button>',
+      [['Done', 'HR.closeModal()', 'pri']], function (root) {
+        root.querySelectorAll('[data-ti]').forEach(function (inp) { inp.onchange = async function () { var t = S.types.find(function (x) { return x.id === inp.getAttribute('data-ti'); }); t[inp.getAttribute('data-tf')] = inp.getAttribute('data-tf') === 'days' ? (+inp.value || 0) : inp.value; try { await upsert('leave_types', t, t.id); } catch (e) {} }; });
+        root.querySelectorAll('[data-td]').forEach(function (btn) { btn.onclick = async function () { var id = btn.getAttribute('data-td'); try { await del('leave_types', id); } catch (e) {} S.types = S.types.filter(function (x) { return x.id !== id; }); manageTypes(); }; });
+        root.querySelector('#lt_add').onclick = async function () { var t = { id: uid(), name: 'New type', days: 0, paid: true }; S.types.push(t); try { await upsert('leave_types', t, t.id); } catch (e) {} manageTypes(); };
+      });
+  }
+
+  /* ---- Rates settings ---- */
+  function drawSettings(b) {
+    b.innerHTML = '<div class="hr-head"><h3>Statutory rates</h3></div><div class="hr-note">Edit when KRA changes them. Applies to new payroll runs.</div>' +
+      field('Personal relief (KES/mo)', '<input id="c_relief" type="number" value="' + PAY_CFG.personalRelief + '">') +
+      field('SHIF rate (%)', '<input id="c_shif" type="number" step="0.01" value="' + (PAY_CFG.shifRate * 100) + '">') +
+      field('NSSF rate (%)', '<input id="c_nssf" type="number" step="0.01" value="' + (PAY_CFG.nssfRate * 100) + '">') +
+      field('NSSF ceiling (KES)', '<input id="c_nssfc" type="number" value="' + PAY_CFG.nssfCeiling + '">') +
+      field('Housing levy (%)', '<input id="c_house" type="number" step="0.01" value="' + (PAY_CFG.housingRate * 100) + '">') +
+      '<button class="hr-btn pri" onclick="HR.saveCfg()">Save rates</button><div class="hr-note">PAYE bands follow the standard KRA schedule (10/25/30/32.5/35%).</div>';
+  }
+  async function saveCfg() {
+    var g = function (id) { return +document.getElementById(id).value; };
+    PAY_CFG.personalRelief = g('c_relief'); PAY_CFG.shifRate = g('c_shif') / 100; PAY_CFG.nssfRate = g('c_nssf') / 100; PAY_CFG.nssfCeiling = g('c_nssfc'); PAY_CFG.housingRate = g('c_house') / 100;
+    try { await upsert('leave_types', { id: '_payroll_cfg', cfg: PAY_CFG, _cfg: true }, '_payroll_cfg'); } catch (e) {}
+    toast('Rates saved');
+  }
+
+  /* ---- modal + field helpers ---- */
+  function field(label, inner) { return '<div class="hr-fld"><span>' + label + '</span>' + inner + '</div>'; }
+  function modal(title, body, btns, after) {
+    closeModal();
+    var m = document.createElement('div'); m.id = 'hrModal'; m.className = 'hr-modal';
+    m.innerHTML = '<div class="hr-sheet"><div class="hr-sh-top"><b>' + title + '</b><button class="hr-x" onclick="HR.closeModal()">×</button></div><div class="hr-sh-body">' + body + '</div><div class="hr-sh-btns">' + (btns || []).map(function (b) { return '<button class="hr-btn ' + (b[2] || '') + '" onclick="' + b[1] + '">' + b[0] + '</button>'; }).join('') + '</div></div>';
+    document.body.appendChild(m); if (after) try { after(m); } catch (e) {}
+  }
+  function closeModal() { var m = document.getElementById('hrModal'); if (m) m.remove(); }
+
+  /* ---- open / close ---- */
+  async function open() {
+    if (!isAdm()) { toast('Payroll is for admins only'); return; }
+    if (!SID()) { toast('Sign in to the clinic first'); return; }
+    shell(); document.getElementById('hrOverlay').style.display = 'flex';
+    var b = document.getElementById('hrBody'); b.innerHTML = '<div class="hr-empty">Loading…</div>';
+    try { await loadAll(); draw(); } catch (e) { b.innerHTML = '<div class="hr-empty">Could not load HR data.<br>' + esc(e.message) + '</div>'; }
+    audit('HR: opened', '');
+  }
+  function close() { var o = document.getElementById('hrOverlay'); if (o) o.style.display = 'none'; closeModal(); }
+
+  /* ---- styles ---- */
+  var css = document.createElement('style'); css.textContent =
+    '.hrov{position:fixed;inset:0;z-index:9000;background:var(--bg,#0e1512);color:var(--text,#eef5f1);display:none;flex-direction:column;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}' +
+    '.hr-top{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line,#26332d);font-size:16px}.hr-sp{flex:1}' +
+    '.hr-x{background:none;border:none;color:inherit;font-size:22px;cursor:pointer;line-height:1}' +
+    '.hr-tabs{display:flex;gap:4px;padding:8px 10px;border-bottom:1px solid var(--line,#26332d);overflow:auto}' +
+    '.hr-tab{border:1px solid var(--line,#26332d);background:var(--card,#18221e);color:var(--muted,#a9b8b0);border-radius:999px;padding:7px 14px;font-size:13px;cursor:pointer;white-space:nowrap}.hr-tab.on{background:var(--accent,#e8a33d);color:#1a1205;border-color:var(--accent,#e8a33d);font-weight:600}' +
+    '.hr-body{flex:1;overflow:auto;padding:14px;max-width:760px;width:100%;margin:0 auto}' +
+    '.hr-head{display:flex;align-items:center;justify-content:space-between;margin:14px 0 8px}.hr-head h3{margin:0;font-size:15px}' +
+    '.hr-row{display:flex;align-items:center;gap:10px;background:var(--card,#18221e);border:1px solid var(--line,#26332d);border-radius:12px;padding:12px;margin-bottom:8px}.hr-grow{flex:1;min-width:0}.hr-t{font-weight:600}.hr-s{color:var(--muted,#a9b8b0);font-size:12.5px}' +
+    '.hr-btn{border:1px solid var(--line,#26332d);background:var(--card,#18221e);color:var(--text,#eef5f1);border-radius:9px;padding:8px 12px;font-size:13px;cursor:pointer}.hr-btn.pri{background:var(--accent,#e8a33d);color:#1a1205;border-color:var(--accent,#e8a33d);font-weight:600}.hr-btn.danger{color:#ff8f8f;border-color:#5a2a2a}.hr-btn.sm{padding:5px 10px;font-size:12px}' +
+    '.hr-empty,.hr-note{color:var(--muted,#a9b8b0);font-size:13px}.hr-empty{text-align:center;padding:30px 10px}.hr-note{background:var(--card,#18221e);border:1px solid var(--line,#26332d);border-radius:10px;padding:9px 12px;margin-bottom:10px}' +
+    '.hr-fld{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}.hr-fld span{font-size:12px;color:var(--muted,#a9b8b0)}' +
+    '.hrov input,.hrov select{background:var(--bg,#0e1512);border:1px solid var(--line,#26332d);color:var(--text,#eef5f1);border-radius:9px;padding:9px 11px;font-size:14px;width:100%}' +
+    '.hr-allow{display:flex;gap:6px;margin-bottom:6px}.hr-allow input{flex:1}.hr-del{background:none;border:none;color:#e88;font-size:18px;cursor:pointer}' +
+    '.hr-chk{display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0}.hr-chk input{width:auto}' +
+    '.hr-modal{position:fixed;inset:0;z-index:9100;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center}' +
+    '.hr-sheet{background:var(--bg,#0e1512);border:1px solid var(--line,#26332d);border-radius:16px 16px 0 0;width:100%;max-width:560px;max-height:92vh;display:flex;flex-direction:column}' +
+    '.hr-sh-top{display:flex;align-items:center;justify-content:space-between;padding:14px;border-bottom:1px solid var(--line,#26332d)}.hr-sh-body{overflow:auto;padding:14px}.hr-sh-btns{display:flex;gap:8px;justify-content:flex-end;padding:12px 14px;border-top:1px solid var(--line,#26332d)}' +
+    '.hr-pl{background:var(--card,#18221e);border:1px solid var(--line,#26332d);border-radius:10px;padding:10px;margin-bottom:8px}.hr-plh{display:flex;justify-content:space-between;font-weight:600}.hr-plh span{color:var(--accent,#e8a33d)}.hr-plg{display:flex;flex-wrap:wrap;gap:8px;color:var(--muted,#a9b8b0);font-size:11.5px;margin:4px 0}.hr-pld{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted,#a9b8b0)}.hr-pld input{max-width:120px}' +
+    '.hr-sum{display:flex;gap:8px;margin-bottom:12px}.hr-sum div{flex:1;background:var(--card,#18221e);border:1px solid var(--line,#26332d);border-radius:10px;padding:10px;text-align:center}.hr-sum b{display:block;font-size:17px}.hr-sum span{font-size:11px;color:var(--muted,#a9b8b0)}' +
+    '.hr-bal{display:inline-block;font-size:11px;color:var(--muted,#a9b8b0);margin-right:4px}' +
+    '.ps h2{margin:0}.pst{width:100%;border-collapse:collapse}.pst td{padding:4px 2px;border-bottom:1px solid var(--line,#26332d)}.pst .r{text-align:right}.pst .tot td{border-top:2px solid var(--accent,#e8a33d);font-weight:700}.pst.net td{background:var(--card,#18221e);font-size:16px;padding:8px 6px}.psm{color:var(--muted);margin-bottom:8px}.psf{color:var(--muted,#a9b8b0);font-size:12px;margin-top:10px}#psWrap h4{margin:10px 0 2px;font-size:13px}';
+  document.head.appendChild(css);
+
+  window.HR = { open: open, close: close, closeModal: closeModal, editEmp: editEmp, saveEmp: saveEmp, delEmp: delEmp, newRun: newRun, saveRun: saveRun, viewRun: viewRun, payslip: payslip, printSlip: printSlip, printRun: printRun, waSlip: waSlip, reqLeave: reqLeave, saveLeave: saveLeave, decide: decide, manageTypes: manageTypes, saveCfg: saveCfg };
+  window.openHR = open;
+
+  /* ---- admin entry button in the back office ---- */
+  function addEntry() {
+    try {
+      var nav = document.querySelector('.backoffice-tabs') || document.getElementById('backofficeNav');
+      if (nav && !document.getElementById('hrEntryBtn')) {
+        var btn = document.createElement('button'); btn.id = 'hrEntryBtn'; btn.textContent = 'HR / Payroll'; btn.onclick = open;
+        nav.appendChild(btn);
+      }
+      var b = document.getElementById('hrEntryBtn'); if (b) b.style.display = isAdm() ? '' : 'none';
+    } catch (e) {}
+  }
+  if (typeof openBackoffice === 'function') { var _ob = openBackoffice; try { window.openBackoffice = function () { var r = _ob.apply(this, arguments); setTimeout(addEntry, 0); return r; }; openBackoffice = window.openBackoffice; } catch (e) {} }
+  document.addEventListener('DOMContentLoaded', function () { setTimeout(addEntry, 1500); });
+  setTimeout(addEntry, 2500);
+})();
+
+</script>
 </body>
 </html>
