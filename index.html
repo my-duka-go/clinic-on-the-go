@@ -7294,5 +7294,69 @@ html[data-theme="dark"] .view input:not([type=checkbox]):not([type=radio]),html[
 })();
 
 </script>
+<script>
+/* ===== Clinic: today's-appointments pop-up on app open (front office + doctor/nurse + admin) ===== */
+(function () {
+  if (window.__apptPopup) return; window.__apptPopup = true;
+  // receptionist (front office), supervisor (Doctor), cashier (Nurse), admin. Not pharmacist.
+  var ALLOWED = { receptionist: 1, supervisor: 1, cashier: 1, admin: 1 };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+
+  function keyToday() {
+    try { if (typeof dayKey === 'function') return dayKey(Date.now()); } catch (e) {}
+    var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function render(appts, k) {
+    if (document.getElementById('apptPop')) return;
+    var rows = appts.map(function (a) {
+      var t = a.time ? '<span class="ap-t">' + esc(a.time) + '</span>' : '<span class="ap-t ap-any">any time</span>';
+      var sub = [a.patient_no ? '#' + esc(a.patient_no) : '', a.kind === 'fp' ? 'follow-up' : (a.reason || a.notes || '')].filter(Boolean).join(' &middot; ');
+      return '<div class="ap-row">' + t + '<div class="ap-g"><div class="ap-n">' + esc(a.name || 'Patient') + '</div>' + (sub ? '<div class="ap-s">' + sub + '</div>' : '') + '</div></div>';
+    }).join('');
+    var ov = document.createElement('div'); ov.id = 'apptPop'; ov.className = 'ap-ov';
+    ov.innerHTML = '<div class="ap-card"><div class="ap-top"><div><b>Today’s appointments</b><div class="ap-date">' + esc(k) + ' &middot; ' + appts.length + ' booked</div></div><button class="ap-x" aria-label="Close">×</button></div><div class="ap-list">' + rows + '</div><button class="ap-ok">Got it</button></div>';
+    document.body.appendChild(ov);
+    var close = function () { try { ov.remove(); } catch (e) {} };
+    ov.querySelector('.ap-x').onclick = close; ov.querySelector('.ap-ok').onclick = close;
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+  }
+  function CU() { try { return (typeof currentUser !== 'undefined') ? currentUser : null; } catch (e) { return null; } }
+  async function show() {
+    try {
+      var cu = CU();
+      if (!cu || !ALLOWED[cu.role]) return;
+      if (typeof getAll !== 'function') return;
+      var k = keyToday(), seen = 'apptSeen:' + k;
+      try { if (sessionStorage.getItem(seen)) return; } catch (e) {}
+      var appts = (await getAll('appointments')).filter(function (a) { return a && a.status === 'booked' && a.date === k; });
+      try { sessionStorage.setItem(seen, '1'); } catch (e) {}
+      if (!appts.length) return;
+      appts.sort(function (a, b) { return String(a.time || '~').localeCompare(String(b.time || '~')); });
+      render(appts, k);
+    } catch (e) {}
+  }
+  // wait for sign-in, then show once (per day, per session)
+  var done = false, tries = 0;
+  var iv = setInterval(function () {
+    tries++;
+    var cu = CU();
+    if (!done && cu && ALLOWED[cu.role] && typeof getAll === 'function') { done = true; clearInterval(iv); setTimeout(show, 400); }
+    else if (tries > 90) clearInterval(iv);
+  }, 1000);
+
+  var css = document.createElement('style'); css.textContent =
+    '.ap-ov{position:fixed;inset:0;z-index:8800;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}' +
+    '.ap-card{background:var(--bg,#101713);color:var(--text,#eef5f1);border:1px solid var(--line,#26332d);border-radius:16px;width:100%;max-width:440px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4)}' +
+    '.ap-top{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 16px 10px}.ap-top b{font-size:16px}.ap-date{color:var(--muted,#a9b8b0);font-size:12px;margin-top:2px}' +
+    '.ap-x{background:none;border:none;color:var(--muted,#a9b8b0);font-size:24px;line-height:1;cursor:pointer}' +
+    '.ap-list{overflow:auto;padding:0 16px}' +
+    '.ap-row{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line,#26332d)}' +
+    '.ap-t{min-width:62px;font-weight:700;color:var(--accent,#e8a33d);font-size:14px}.ap-any{font-weight:500;color:var(--muted,#a9b8b0);font-size:12px}' +
+    '.ap-g{min-width:0}.ap-n{font-weight:600}.ap-s{color:var(--muted,#a9b8b0);font-size:12.5px}' +
+    '.ap-ok{margin:14px 16px 16px;padding:11px;border:none;border-radius:10px;background:var(--accent,#e8a33d);color:#1a1205;font-weight:600;font-size:15px;cursor:pointer}';
+  document.head.appendChild(css);
+})();
+
+</script>
 </body>
 </html>
